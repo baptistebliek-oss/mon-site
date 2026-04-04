@@ -578,8 +578,8 @@ export default function App() {
       <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse at 50% 0%, rgba(232,57,42,0.08) 0%, transparent 60%)`}}>
         <div style={{width:"100%",maxWidth:380}}>
           <div style={{textAlign:"center",marginBottom:40}}>
-            <div style={{fontSize:60,marginBottom:16,filter:"drop-shadow(0 0 28px rgba(232,57,42,0.5))"}}>🔥</div>
-            <h1 style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(24px,6vw,48px)",fontWeight:700,letterSpacing:5,textTransform:"uppercase",margin:"0 0 10px",color:C.text}}>SAPEURS-POMPIERS</h1>
+            <div style={{fontSize:52,marginBottom:20,lineHeight:1,filter:"drop-shadow(0 0 28px rgba(232,57,42,0.5))"}}>🔥</div>
+<h1 style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(24px,6vw,44px)",fontWeight:700,letterSpacing:5,textTransform:"uppercase",margin:"0 0 10px",color:C.text,lineHeight:1.2}}>SAPEURS-POMPIERS</h1>
             <div style={{fontFamily:"Oswald,sans-serif",color:C.red,letterSpacing:5,textTransform:"uppercase",fontSize:11}}>Plateforme QCM · Formation</div>
           </div>
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:"36px 32px",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
