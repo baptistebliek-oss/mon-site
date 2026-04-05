@@ -199,6 +199,51 @@ const _masteredCats = (results, threshold=80) => {
   return Object.values(bc).filter(rs=>Math.round(rs.reduce((a,r)=>a+r.pct,0)/rs.length)>=threshold).length;
 };
 
+// ─── BADGES DYNAMIQUES PAR CATÉGORIE ────────────────────────────
+// Appelée pour chaque catégorie — génère automatiquement les mêmes
+// familles de badges que les badges globaux, filtrés sur cat.id
+const generateCatBadges = cat => {
+  const cr = r => r.filter(x=>x.cat_id===cat.id);
+  const col = cat.color;
+  return [
+    // 🎯 Bonnes réponses (5 niveaux)
+    { id:`c_${cat.id}_r1`, icon:"🎯", fam:"c_rép", tier:1, catId:cat.id, name:"Tireur",           desc:`20 bonnes rép. en ${cat.name}`,     color:col, check:(s,c,r)=>cr(r).reduce((a,x)=>a+(x.score||0),0)>=20 },
+    { id:`c_${cat.id}_r2`, icon:"🎯", fam:"c_rép", tier:2, catId:cat.id, name:"Précis",            desc:`75 bonnes rép. en ${cat.name}`,     color:col, check:(s,c,r)=>cr(r).reduce((a,x)=>a+(x.score||0),0)>=75 },
+    { id:`c_${cat.id}_r3`, icon:"🎯", fam:"c_rép", tier:3, catId:cat.id, name:"Sniper",            desc:`200 bonnes rép. en ${cat.name}`,    color:col, check:(s,c,r)=>cr(r).reduce((a,x)=>a+(x.score||0),0)>=200 },
+    { id:`c_${cat.id}_r4`, icon:"🎯", fam:"c_rép", tier:4, catId:cat.id, name:"Expert",            desc:`500 bonnes rép. en ${cat.name}`,    color:col, check:(s,c,r)=>cr(r).reduce((a,x)=>a+(x.score||0),0)>=500 },
+    { id:`c_${cat.id}_r5`, icon:"🎯", fam:"c_rép", tier:5, catId:cat.id, name:"Légende",           desc:`1 000 bonnes rép. en ${cat.name}`,  color:col, check:(s,c,r)=>cr(r).reduce((a,x)=>a+(x.score||0),0)>=1000 },
+    // 📋 Examens réalisés (5 niveaux)
+    { id:`c_${cat.id}_e1`, icon:"📋", fam:"c_exm", tier:1, catId:cat.id, name:"Recrue",            desc:`3 examens en ${cat.name}`,          color:col, check:(s,c,r)=>cr(r).length>=3 },
+    { id:`c_${cat.id}_e2`, icon:"📋", fam:"c_exm", tier:2, catId:cat.id, name:"Engagé",            desc:`10 examens en ${cat.name}`,         color:col, check:(s,c,r)=>cr(r).length>=10 },
+    { id:`c_${cat.id}_e3`, icon:"📋", fam:"c_exm", tier:3, catId:cat.id, name:"Régulier",          desc:`25 examens en ${cat.name}`,         color:col, check:(s,c,r)=>cr(r).length>=25 },
+    { id:`c_${cat.id}_e4`, icon:"📋", fam:"c_exm", tier:4, catId:cat.id, name:"Vétéran",           desc:`60 examens en ${cat.name}`,         color:col, check:(s,c,r)=>cr(r).length>=60 },
+    { id:`c_${cat.id}_e5`, icon:"📋", fam:"c_exm", tier:5, catId:cat.id, name:"Élite",             desc:`150 examens en ${cat.name}`,        color:col, check:(s,c,r)=>cr(r).length>=150 },
+    // 💯 Parfaits 100% (4 niveaux)
+    { id:`c_${cat.id}_p1`, icon:"💯", fam:"c_prf", tier:1, catId:cat.id, name:"1ère Flamme",       desc:`1 examen à 100% en ${cat.name}`,    color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct===100).length>=1 },
+    { id:`c_${cat.id}_p2`, icon:"💯", fam:"c_prf", tier:2, catId:cat.id, name:"Sans Faute",        desc:`5 examens à 100% en ${cat.name}`,   color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct===100).length>=5 },
+    { id:`c_${cat.id}_p3`, icon:"💯", fam:"c_prf", tier:3, catId:cat.id, name:"Perfection",        desc:`15 examens à 100% en ${cat.name}`,  color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct===100).length>=15 },
+    { id:`c_${cat.id}_p4`, icon:"💯", fam:"c_prf", tier:4, catId:cat.id, name:"Absolu",            desc:`40 examens à 100% en ${cat.name}`,  color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct===100).length>=40 },
+    // ⭐ Excellence ≥90% (4 niveaux)
+    { id:`c_${cat.id}_n1`, icon:"⭐", fam:"c_exc", tier:1, catId:cat.id, name:"Prometteur",        desc:`3 examens à 90%+ en ${cat.name}`,   color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct>=90).length>=3 },
+    { id:`c_${cat.id}_n2`, icon:"⭐", fam:"c_exc", tier:2, catId:cat.id, name:"Brillant",          desc:`10 examens à 90%+ en ${cat.name}`,  color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct>=90).length>=10 },
+    { id:`c_${cat.id}_n3`, icon:"⭐", fam:"c_exc", tier:3, catId:cat.id, name:"Distingué",         desc:`30 examens à 90%+ en ${cat.name}`,  color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct>=90).length>=30 },
+    { id:`c_${cat.id}_n4`, icon:"⭐", fam:"c_exc", tier:4, catId:cat.id, name:"Exceptionnel",      desc:`75 examens à 90%+ en ${cat.name}`,  color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct>=90).length>=75 },
+    // 🔥 Réussite ≥80% (3 niveaux)
+    { id:`c_${cat.id}_q1`, icon:"🔥", fam:"c_80p", tier:1, catId:cat.id, name:"Solide",            desc:`5 examens à 80%+ en ${cat.name}`,   color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct>=80).length>=5 },
+    { id:`c_${cat.id}_q2`, icon:"🔥", fam:"c_80p", tier:2, catId:cat.id, name:"Performant",        desc:`20 examens à 80%+ en ${cat.name}`,  color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct>=80).length>=20 },
+    { id:`c_${cat.id}_q3`, icon:"🔥", fam:"c_80p", tier:3, catId:cat.id, name:"Irréprochable",     desc:`50 examens à 80%+ en ${cat.name}`,  color:col, check:(s,c,r)=>cr(r).filter(x=>x.pct>=80).length>=50 },
+    // 📈 Progression (3 niveaux)
+    { id:`c_${cat.id}_g1`, icon:"📈", fam:"c_prg", tier:1, catId:cat.id, name:"En Progression",    desc:`+15 pts de progression en ${cat.name}`, color:col,
+      check:(s,c,r)=>{const rs=cr(r).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));return rs.length>=2&&rs[rs.length-1].pct-rs[0].pct>=15;} },
+    { id:`c_${cat.id}_g2`, icon:"📈", fam:"c_prg", tier:2, catId:cat.id, name:"Ascension",         desc:`+30 pts de progression en ${cat.name}`, color:col,
+      check:(s,c,r)=>{const rs=cr(r).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));return rs.length>=2&&rs[rs.length-1].pct-rs[0].pct>=30;} },
+    { id:`c_${cat.id}_g3`, icon:"📈", fam:"c_prg", tier:3, catId:cat.id, name:"Transformation",    desc:`+50 pts de progression en ${cat.name}`, color:col,
+      check:(s,c,r)=>{const rs=cr(r).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));return rs.length>=2&&rs[rs.length-1].pct-rs[0].pct>=50;} },
+  ];
+};
+
+const getAllBadges = cats => [...BADGES, ...cats.flatMap(c=>generateCatBadges(c))];
+
 const computeStats = results => ({
   total:      results.length,
   correct:    results.reduce((a,r)=>a+(r.score||0),0),
@@ -211,7 +256,7 @@ const computeStats = results => ({
 });
 const getUnlocked = (results, cats) => {
   const s = computeStats(results);
-  return BADGES.filter(b=>b.check(s, cats, results));
+  return getAllBadges(cats).filter(b=>b.check(s, cats, results));
 };
 
 // ─── UI ──────────────────────────────────────────────────────────
@@ -1004,35 +1049,33 @@ export default function App() {
 
           {/* Badges */}
           {myResults.length>0&&(()=>{
+            const allB       = getAllBadges(cats);
             const unlocked   = getUnlocked(myResults,cats);
             const unlockedIds= new Set(unlocked.map(b=>b.id));
             const grades     = BADGES.filter(b=>b.grade);
-            const thematic   = BADGES.filter(b=>!b.grade);
-            const stats      = computeStats(myResults);
             const currentGradeIdx = grades.reduce((acc,b,i)=>unlockedIds.has(b.id)?i:acc,-1);
             const currentGrade= grades[currentGradeIdx];
             const nextGrade  = grades[currentGradeIdx+1];
-
-            // Familles de badges thématiques
             const FAM_META = {
-              rép: { label:"🎯 Bonnes réponses",          color:"#eab308" },
-              exm: { label:"📋 Examens réalisés",         color:"#3b82f6" },
-              prf: { label:"💯 Examens parfaits (100%)",  color:"#22c55e" },
-              exc: { label:"⭐ Excellence (≥ 90%)",       color:"#06b6d4" },
-              "80p":{ label:"🔥 Réussite (≥ 80%)",       color:"#f07320" },
-              day: { label:"📅 Assiduité",                color:"#a855f7" },
-              wkl: { label:"⚡ Cadence hebdomadaire",     color:"#94a3b8" },
-              cat: { label:"🏆 Catégories maîtrisées",    color:"#cd7f32" },
-              prg: { label:"📈 Progression",              color:"#94a3b8" },
+              rép:  { label:"🎯 Bonnes réponses",  color:"#eab308" },
+              exm:  { label:"📋 Examens réalisés", color:"#3b82f6" },
+              prf:  { label:"💯 Parfaits 100%",    color:"#22c55e" },
+              exc:  { label:"⭐ Excellence 90%+",  color:"#06b6d4" },
+              "80p":{ label:"🔥 Réussite 80%+",    color:"#f07320" },
+              day:  { label:"📅 Assiduité",        color:"#a855f7" },
+              wkl:  { label:"⚡ Cadence hebdo",    color:"#94a3b8" },
+              cat:  { label:"🏆 Catégories",       color:"#cd7f32" },
+              prg:  { label:"📈 Progression",      color:"#94a3b8" },
             };
-            const famKeys = Object.keys(FAM_META);
-            const specials = thematic.filter(b=>!b.fam);
+            const CAT_FAMS = ["c_rép","c_exm","c_prf","c_exc","c_80p","c_prg"];
+            const CAT_FAM_LABELS = {c_rép:"🎯 Rép.",c_exm:"📋 Examens",c_prf:"💯 Parfaits",c_exc:"⭐ 90%+",c_80p:"🔥 80%+",c_prg:"📈 Progrès"};
+            const CAT_FAM_COLORS = {c_rép:"#eab308",c_exm:"#3b82f6",c_prf:"#22c55e",c_exc:"#06b6d4",c_80p:"#f07320",c_prg:"#94a3b8"};
 
             return (
               <div>
                 {/* Grade actuel */}
                 {currentGrade&&(
-                  <div style={{background:`linear-gradient(135deg, ${currentGrade.color}18, ${currentGrade.color}06)`,border:`1px solid ${currentGrade.color}44`,borderRadius:8,padding:"18px 22px",marginBottom:28,display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
+                  <div style={{background:`linear-gradient(135deg,${currentGrade.color}18,${currentGrade.color}06)`,border:`1px solid ${currentGrade.color}44`,borderRadius:8,padding:"18px 22px",marginBottom:28,display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
                     <GradeInsignia id={currentGrade.id} unlocked={true} size={72}/>
                     <div style={{flex:1,minWidth:200}}>
                       <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,color:currentGrade.color,textTransform:"uppercase",marginBottom:4}}>Grade actuel</div>
@@ -1040,7 +1083,7 @@ export default function App() {
                       {nextGrade&&<div style={{color:C.muted,fontSize:12,marginTop:4}}>Prochain : <strong style={{color:C.text2}}>{nextGrade.name}</strong> — {nextGrade.desc}</div>}
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
-                      <div style={{fontFamily:"Oswald,sans-serif",fontSize:28,fontWeight:700,color:currentGrade.color}}>{unlocked.length}<span style={{fontSize:14,color:C.muted}}>/{BADGES.length}</span></div>
+                      <div style={{fontFamily:"Oswald,sans-serif",fontSize:28,fontWeight:700,color:currentGrade.color}}>{unlocked.length}<span style={{fontSize:14,color:C.muted}}>/{allB.length}</span></div>
                       <div style={{color:C.muted,fontSize:11}}>badges débloqués</div>
                     </div>
                   </div>
@@ -1055,24 +1098,25 @@ export default function App() {
                   {grades.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
                 </div>
 
-                {/* Familles thématiques */}
-                {famKeys.map(fk=>{
+                {/* Badges globaux par famille */}
+                <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted,marginBottom:20}}>Badges globaux</div>
+                {Object.keys(FAM_META).map(fk=>{
                   const fam=BADGES.filter(b=>b.fam===fk).sort((a,b2)=>a.tier-b2.tier);
-                  const famUnlocked=fam.filter(b=>unlockedIds.has(b.id)).length;
-                  const nextInFam=fam.find(b=>!unlockedIds.has(b.id));
+                  if(!fam.length) return null;
                   const meta=FAM_META[fk];
+                  const nU=fam.filter(b=>unlockedIds.has(b.id)).length;
+                  const nxt=fam.find(b=>!unlockedIds.has(b.id));
                   return (
-                    <div key={fk} style={{marginBottom:24}}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                    <div key={fk} style={{marginBottom:20}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                         <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:meta.color}}>{meta.label}</span>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
-                          {nextInFam&&<span style={{color:C.muted,fontSize:11}}>Suivant : <strong style={{color:C.text2}}>{nextInFam.desc}</strong></span>}
-                          <span style={{color:C.muted,fontSize:11}}>{famUnlocked}/{fam.length}</span>
+                          {nxt&&<span style={{color:C.muted,fontSize:11}}>Suivant : <strong style={{color:C.text2}}>{nxt.desc}</strong></span>}
+                          <span style={{color:C.muted,fontSize:11}}>{nU}/{fam.length}</span>
                         </div>
                       </div>
-                      {/* Barre de progression famille */}
                       <div style={{background:C.border,borderRadius:99,height:3,marginBottom:10,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:`${fam.length?famUnlocked/fam.length*100:0}%`,background:meta.color,borderRadius:99,transition:"width 0.5s"}}/>
+                        <div style={{height:"100%",width:`${fam.length?nU/fam.length*100:0}%`,background:meta.color,borderRadius:99,transition:"width 0.5s"}}/>
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:`repeat(${fam.length},1fr)`,gap:6}}>
                         {fam.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
@@ -1082,13 +1126,63 @@ export default function App() {
                 })}
 
                 {/* Badges spéciaux */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                  <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Badges spéciaux</span>
-                  <span style={{color:C.muted,fontSize:12}}>{specials.filter(b=>unlockedIds.has(b.id)).length}/{specials.length}</span>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:8}}>
-                  {specials.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
-                </div>
+                {(()=>{
+                  const sp=BADGES.filter(b=>!b.grade&&!b.fam);
+                  return (
+                    <div style={{marginBottom:32}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                        <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Badges spéciaux</span>
+                        <span style={{color:C.muted,fontSize:12}}>{sp.filter(b=>unlockedIds.has(b.id)).length}/{sp.length}</span>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:8}}>
+                        {sp.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── BADGES PAR CATÉGORIE (auto-générés) ── */}
+                {cats.length>0&&(
+                  <div style={{paddingTop:8,borderTop:`1px solid ${C.border}`}}>
+                    <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted,marginBottom:20,marginTop:8}}>
+                      Badges par catégorie
+                    </div>
+                    {cats.map(cat=>{
+                      const catB=generateCatBadges(cat);
+                      const nCatU=catB.filter(b=>unlockedIds.has(b.id)).length;
+                      return (
+                        <div key={cat.id} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${cat.color}`,borderRadius:6,padding:"16px 18px",marginBottom:14}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <div style={{width:9,height:9,borderRadius:"50%",background:cat.color,boxShadow:`0 0 7px ${cat.color}`}}/>
+                              <span style={{fontFamily:"Oswald,sans-serif",fontSize:14,fontWeight:700,letterSpacing:1}}>{cat.name}</span>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <div style={{width:72,background:C.border,borderRadius:99,height:4,overflow:"hidden"}}>
+                                <div style={{height:"100%",width:`${catB.length?nCatU/catB.length*100:0}%`,background:cat.color,borderRadius:99,transition:"width 0.5s"}}/>
+                              </div>
+                              <span style={{color:C.muted,fontSize:11}}>{nCatU}/{catB.length}</span>
+                            </div>
+                          </div>
+                          {CAT_FAMS.map(fk=>{
+                            const fam=catB.filter(b=>b.fam===fk).sort((a,b2)=>a.tier-b2.tier);
+                            const nU=fam.filter(b=>unlockedIds.has(b.id)).length;
+                            const nxt=fam.find(b=>!unlockedIds.has(b.id));
+                            return (
+                              <div key={fk} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                                <span style={{color:CAT_FAM_COLORS[fk],fontSize:11,minWidth:86,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>{CAT_FAM_LABELS[fk]}</span>
+                                <div style={{display:"grid",gridTemplateColumns:`repeat(${fam.length},1fr)`,gap:5,flex:1,maxWidth:fam.length*58}}>
+                                  {fam.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
+                                </div>
+                                {nxt&&<span style={{color:C.muted,fontSize:10,flex:1,lineHeight:1.3}}>{nxt.desc}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })()}
