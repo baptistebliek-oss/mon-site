@@ -180,18 +180,122 @@ const StatCard = ({label,value,color=C.text}) => (
     <div style={{color:C.text2,fontSize:12,marginTop:6}}>{label}</div>
   </div>
 );
-const BadgeCard = ({badge,unlocked,nextGrade,stats}) => (
-  <div title={badge.desc} style={{background:unlocked?C.card:C.surf,border:`1px solid ${unlocked?badge.color+"55":C.border}`,borderRadius:6,padding:badge.grade?"14px 12px":"12px 10px",textAlign:"center",opacity:unlocked?1:0.38,transition:"all 0.2s",position:"relative",overflow:"hidden",cursor:"default"}}>
-    {unlocked&&badge.grade&&<div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse at 50% 0%, ${badge.color}22 0%, transparent 65%)`}}/>}
-    {unlocked&&!badge.grade&&<div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 0%, ${badge.color}14 0%, transparent 60%)`}}/>}
-    <div style={{fontSize:badge.grade?26:22,marginBottom:6,filter:unlocked?`drop-shadow(0 0 6px ${badge.color}88)`:"none"}}>{badge.icon}</div>
-    <div style={{fontSize:badge.grade?10:9,fontWeight:700,color:unlocked?badge.color:C.muted,fontFamily:"Oswald,sans-serif",letterSpacing:0.8,textTransform:"uppercase",lineHeight:1.3,marginBottom:3}}>{badge.name}</div>
-    {badge.grade&&unlocked&&<div style={{width:20,height:2,borderRadius:99,background:badge.color,margin:"5px auto 0",boxShadow:`0 0 6px ${badge.color}`}}/>}
-    {!unlocked&&nextGrade&&stats&&(
-      <div style={{marginTop:6,fontSize:9,color:"#3a3a42"}}>
-        {stats.total}/{nextGrade.total||"—"}
-      </div>
-    )}
+// ─── INSIGNE SVG PAR GRADE ───────────────────────────────────────
+const GradeInsignia = ({ id, unlocked, size=52 }) => {
+  const W=56, H=56, bg="#1c1c26", clipId=`gi-${id}`;
+
+  // Chevron diagonal (/), cx = centre en x à mi-hauteur
+  const Diag = ({cx, color, sw=7, bColor}) => {
+    const x0=cx-H/2, ext=14;
+    return (
+      <g>
+        {bColor&&<line x1={x0-ext} y1={H+ext} x2={x0+H+ext} y2={-ext} stroke={bColor} strokeWidth={sw+4} strokeLinecap="butt"/>}
+        <line x1={x0-ext} y1={H+ext} x2={x0+H+ext} y2={-ext} stroke={color} strokeWidth={sw} strokeLinecap="butt"/>
+      </g>
+    );
+  };
+
+  // Bande horizontale
+  const Horiz = ({y, color, h=5}) => (
+    <rect x={7} y={y-h/2} width={W-14} height={h} fill={color} rx={0.5}/>
+  );
+
+  // Flocon de neige (contrôleur général)
+  const Flake = ({cx, cy, r=8, color}) => (
+    <g>
+      {[0,1,2,3,4,5].map(i=>{
+        const a=i*Math.PI/3;
+        const ex=cx+Math.cos(a)*r, ey=cy+Math.sin(a)*r;
+        const mx=cx+Math.cos(a)*r*0.55, my=cy+Math.sin(a)*r*0.55;
+        return (
+          <g key={i}>
+            <line x1={cx} y1={cy} x2={ex} y2={ey} stroke={color} strokeWidth={1.6} strokeLinecap="round"/>
+            <line x1={mx+Math.cos(a+Math.PI/2)*r*0.22} y1={my+Math.sin(a+Math.PI/2)*r*0.22} x2={mx} y2={my} stroke={color} strokeWidth={1.1} strokeLinecap="round"/>
+            <line x1={mx+Math.cos(a-Math.PI/2)*r*0.22} y1={my+Math.sin(a-Math.PI/2)*r*0.22} x2={mx} y2={my} stroke={color} strokeWidth={1.1} strokeLinecap="round"/>
+          </g>
+        );
+      })}
+      <circle cx={cx} cy={cy} r={1.8} fill={color}/>
+    </g>
+  );
+
+  // n chevrons équirépartis
+  const nDiag = (n, color, sw, bColor) =>
+    Array.from({length:n},(_,i) => <Diag key={i} cx={W*(i+1)/(n+1)} color={color} sw={sw} bColor={bColor}/>);
+
+  // n bandes horizontales équiréparties
+  const nHoriz = (n, colFn, h=5) =>
+    Array.from({length:n},(_,i) => <Horiz key={i} y={H*(i+1)/(n+1)} color={typeof colFn==="function"?colFn(i,n):colFn} h={h}/>);
+
+  const insignia = () => {
+    switch(id){
+      case "g1":  // Auxiliaire — carré bleu
+        return <rect x={11} y={11} width={W-22} height={H-22} fill="#4f7be8" rx={2}/>;
+      case "g2":  // Sapeur 2e — 1 chevron rouge
+        return nDiag(1,"#e8392a",8);
+      case "g3":  // Sapeur 1re — 2 chevrons rouges
+        return nDiag(2,"#e8392a",7);
+      case "g4":  // Caporal — 3 chevrons rouges
+        return nDiag(3,"#e8392a",6);
+      case "g5":  // Caporal-chef — 4 chevrons rouges
+        return nDiag(4,"#e8392a",5);
+      case "g6":  // Sergent — 1 chevron blanc liseré rouge
+        return nDiag(1,"#e8e6e1",9,"#e8392a");
+      case "g7":  // Sergent-chef — 4 chevrons blancs liserés rouge
+        return nDiag(4,"#e8e6e1",6,"#e8392a");
+      case "g8":  // Adjudant — 1 bande orange épaisse
+        return nHoriz(1,"#f07320",10);
+      case "g9":  // Adjudant-chef — 1 bande blanche épaisse
+        return nHoriz(1,"#e8e6e1",10);
+      case "g10": // Lieutenant — 2 bandes blanches
+        return nHoriz(2,"#e8e6e1",5);
+      case "g11": // Capitaine — 3 bandes blanches
+        return nHoriz(3,"#e8e6e1",5);
+      case "g12": // Commandant — 4 bandes (1 or + 3 blanches)
+        return nHoriz(4,(i)=>i===0?"#eab308":"#e8e6e1",4);
+      case "g13": // Lieutenant-colonel — 2 bandes or
+        return nHoriz(2,"#eab308",5);
+      case "g14": // Colonel — 5 bandes blanches
+        return nHoriz(5,"#e8e6e1",4);
+      case "g15": // Contrôleur général — 2 flocons or
+        return [W*0.32, W*0.68].map((cx,i)=><Flake key={i} cx={cx} cy={H/2} r={9} color="#eab308"/>);
+      case "g16": // Contrôleur général d'État — 3 flocons or
+        return [W*0.2, W*0.5, W*0.8].map((cx,i)=><Flake key={i} cx={cx} cy={H/2} r={8} color="#eab308"/>);
+      default: return null;
+    }
+  };
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width={size} height={size} style={{display:"block"}}>
+      <defs>
+        <clipPath id={clipId}><rect width={W} height={H} rx={3}/></clipPath>
+      </defs>
+      {/* Fond */}
+      <rect width={W} height={H} fill={bg} rx={3}/>
+      {/* Bordure externe (liseré métallique) */}
+      <rect x={0.5} y={0.5} width={W-1} height={H-1} fill="none" stroke={unlocked?"#3a3a4a":"#1e1e24"} strokeWidth={1} rx={3}/>
+      {/* Insigne (clippé) */}
+      <g clipPath={`url(#${clipId})`} opacity={unlocked?1:0.28}>
+        {insignia()}
+      </g>
+      {/* Reflet subtil si débloqué */}
+      {unlocked&&<rect x={0} y={0} width={W} height={H/2} fill="url(#shine)" rx={3} opacity={0.04}/>}
+    </svg>
+  );
+};
+
+const BadgeCard = ({badge, unlocked}) => (
+  <div title={badge.desc} style={{background:unlocked?C.card:C.surf, border:`1px solid ${unlocked?badge.color+"44":C.border}`, borderRadius:6, padding:"10px 8px", textAlign:"center", opacity:unlocked?1:0.35, transition:"all 0.2s", position:"relative", overflow:"hidden", cursor:"default"}}>
+    {unlocked&&<div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse at 50% 0%, ${badge.color}18 0%, transparent 65%)`}}/>}
+    {/* Insigne SVG pour les grades, emoji pour les badges thématiques */}
+    <div style={{display:"flex",justifyContent:"center",marginBottom:6}}>
+      {badge.grade
+        ? <GradeInsignia id={badge.id} unlocked={unlocked} size={48}/>
+        : <div style={{fontSize:24,filter:unlocked?`drop-shadow(0 0 5px ${badge.color}88)`:"none"}}>{badge.icon}</div>
+      }
+    </div>
+    <div style={{fontSize:9,fontWeight:700,color:unlocked?badge.color:C.muted,fontFamily:"Oswald,sans-serif",letterSpacing:0.8,textTransform:"uppercase",lineHeight:1.3}}>{badge.name}</div>
+    {unlocked&&<div style={{width:16,height:2,borderRadius:99,background:badge.color,margin:"5px auto 0",boxShadow:`0 0 5px ${badge.color}`}}/>}
   </div>
 );
 
@@ -833,8 +937,8 @@ export default function App() {
               <div>
                 {/* Grade actuel */}
                 {currentGrade&&(
-                  <div style={{background:`linear-gradient(135deg, ${currentGrade.color}18, ${currentGrade.color}06)`,border:`1px solid ${currentGrade.color}44`,borderRadius:8,padding:"18px 22px",marginBottom:28,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-                    <div style={{fontSize:36,filter:`drop-shadow(0 0 12px ${currentGrade.color}88)`}}>{currentGrade.icon}</div>
+                  <div style={{background:`linear-gradient(135deg, ${currentGrade.color}18, ${currentGrade.color}06)`,border:`1px solid ${currentGrade.color}44`,borderRadius:8,padding:"18px 22px",marginBottom:28,display:"flex",alignItems:"center",gap:20,flexWrap:"wrap"}}>
+                    <GradeInsignia id={currentGrade.id} unlocked={true} size={72}/>
                     <div style={{flex:1,minWidth:200}}>
                       <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,color:currentGrade.color,textTransform:"uppercase",marginBottom:4}}>Grade actuel</div>
                       <div style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700,color:C.text}}>{currentGrade.name}</div>
@@ -1060,8 +1164,8 @@ export default function App() {
             return (
               <div style={{marginBottom:32}}>
                 {currentGrade&&(
-                  <div style={{background:`linear-gradient(135deg,${currentGrade.color}18,${currentGrade.color}06)`,border:`1px solid ${currentGrade.color}44`,borderRadius:8,padding:"16px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                    <div style={{fontSize:32,filter:`drop-shadow(0 0 10px ${currentGrade.color}88)`}}>{currentGrade.icon}</div>
+                  <div style={{background:`linear-gradient(135deg,${currentGrade.color}18,${currentGrade.color}06)`,border:`1px solid ${currentGrade.color}44`,borderRadius:8,padding:"16px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                    <GradeInsignia id={currentGrade.id} unlocked={true} size={64}/>
                     <div style={{flex:1,minWidth:160}}>
                       <div style={{fontFamily:"Oswald,sans-serif",fontSize:10,letterSpacing:3,color:currentGrade.color,textTransform:"uppercase",marginBottom:3}}>Grade actuel</div>
                       <div style={{fontFamily:"Oswald,sans-serif",fontSize:20,fontWeight:700}}>{currentGrade.name}</div>
