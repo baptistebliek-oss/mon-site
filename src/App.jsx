@@ -1,7 +1,3 @@
-// ─── INSTALLATION ────────────────────────────────────────────────
-// npm install @supabase/supabase-js
-// Variables Vercel : VITE_SUPABASE_URL  /  VITE_SUPABASE_ANON_KEY
-// ─────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,7 +6,6 @@ const sb = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
-// ─── DESIGN TOKENS ───────────────────────────────────────────────
 const C = {
   bg:"#06060a", surf:"#0e0e14", card:"#13131a", card2:"#18181f",
   border:"#1e1e28", border2:"#26262f", red:"#e8392a", redDim:"#b82e20",
@@ -25,10 +20,13 @@ const DOC_TYPES = [
   { key:"source",     label:"Sources",     icon:"🔗", color:C.blueL },
   { key:"fiche_memo", label:"Fiches mémo", icon:"📋", color:C.purpleL },
 ];
-const EXAM_COUNTS = [10, 20, 30, 50];
-const TIMER_DEFAULT = 30; // secondes par question
 
-// ─── TRADUCTION ERREURS AUTH ──────────────────────────────────────
+// Examen Blanc : max 40 questions, timer global 60 minutes
+const EXAMEN_BLANC_MAX = 40;
+const EXAMEN_BLANC_TIMER = 60 * 60; // secondes
+const EXAM_COUNTS = [10, 20, 30];
+const TIMER_DEFAULT = 30; // secondes par question (modes cat/révision)
+
 const AUTH_ERRORS = {
   "Invalid login credentials":"Email ou mot de passe incorrect.",
   "Email not confirmed":"Confirmez votre email avant de vous connecter.",
@@ -41,7 +39,6 @@ const AUTH_ERRORS = {
 };
 const tr = msg => AUTH_ERRORS[msg] || msg;
 
-// ─── HELPERS ─────────────────────────────────────────────────────
 const fmtDate = ts => new Date(ts).toLocaleDateString("fr-FR",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
 const timeAgo = ts => {
   const s = Math.floor((Date.now()-new Date(ts).getTime())/1000);
@@ -50,30 +47,33 @@ const timeAgo = ts => {
   if(s<86400) return `il y a ${Math.floor(s/3600)}h`;
   return `il y a ${Math.floor(s/86400)}j`;
 };
+const fmtTimer = s => {
+  const m = Math.floor(s/60);
+  const sec = s%60;
+  return `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+};
 const pct2col = p => p>=70 ? C.greenL : p>=50 ? C.orange : C.red;
-const clamp = (v,min,max) => Math.min(max,Math.max(min,v));
 
-// ─── SYSTÈME DE BADGES ───────────────────────────────────────────
 const BADGES = [
-  { id:"first",     icon:"🔰", name:"Recrue",         desc:"1er questionnaire complété",          color:"#6b7280", check:(s)=>s.total>=1 },
-  { id:"quiz5",     icon:"📋", name:"Stagiaire",       desc:"5 questionnaires complétés",          color:"#a8966a", check:(s)=>s.total>=5 },
-  { id:"quiz20",    icon:"🎖️", name:"Sapeur",          desc:"20 questionnaires complétés",         color:"#b45309", check:(s)=>s.total>=20 },
-  { id:"quiz50",    icon:"🏅", name:"Caporal",         desc:"50 questionnaires complétés",         color:"#94a3b8", check:(s)=>s.total>=50 },
-  { id:"quiz100",   icon:"⭐", name:"Sergent",         desc:"100 questionnaires complétés",        color:"#eab308", check:(s)=>s.total>=100 },
-  { id:"c100",      icon:"✅", name:"Centurion",       desc:"100 bonnes réponses au total",        color:"#22c55e", check:(s)=>s.correct>=100 },
-  { id:"c500",      icon:"🎯", name:"Tireur d'élite",  desc:"500 bonnes réponses au total",        color:"#16a34a", check:(s)=>s.correct>=500 },
-  { id:"avg70",     icon:"📈", name:"Compétent",       desc:"Moyenne générale ≥ 70%",              color:"#3b82f6", check:(s)=>s.avg>=70&&s.total>=3 },
-  { id:"avg85",     icon:"🔥", name:"Expert",          desc:"Moyenne générale ≥ 85%",              color:"#f07320", check:(s)=>s.avg>=85&&s.total>=5 },
-  { id:"avg95",     icon:"💎", name:"Maître",          desc:"Moyenne générale ≥ 95%",              color:"#e8392a", check:(s)=>s.avg>=95&&s.total>=10 },
-  { id:"perfect",   icon:"🏆", name:"Sans faute",      desc:"Score parfait 100% sur un examen",   color:"#eab308", check:(s)=>s.perfect },
-  { id:"poly",      icon:"🌐", name:"Polyvalent",      desc:"Examen dans toutes les catégories",   color:"#a855f7", check:(s,cats)=>cats.length>0&&s.uniqueCats>=cats.length },
+  { id:"first",   icon:"🔰", name:"Recrue",        desc:"1er questionnaire complété",         color:"#6b7280", check:(s)=>s.total>=1 },
+  { id:"quiz5",   icon:"📋", name:"Stagiaire",      desc:"5 questionnaires complétés",         color:"#a8966a", check:(s)=>s.total>=5 },
+  { id:"quiz20",  icon:"🎖️", name:"Sapeur",         desc:"20 questionnaires complétés",        color:"#b45309", check:(s)=>s.total>=20 },
+  { id:"quiz50",  icon:"🏅", name:"Caporal",        desc:"50 questionnaires complétés",        color:"#94a3b8", check:(s)=>s.total>=50 },
+  { id:"quiz100", icon:"⭐", name:"Sergent",        desc:"100 questionnaires complétés",       color:"#eab308", check:(s)=>s.total>=100 },
+  { id:"c100",    icon:"✅", name:"Centurion",      desc:"100 bonnes réponses au total",       color:"#22c55e", check:(s)=>s.correct>=100 },
+  { id:"c500",    icon:"🎯", name:"Tireur d'élite", desc:"500 bonnes réponses au total",       color:"#16a34a", check:(s)=>s.correct>=500 },
+  { id:"avg70",   icon:"📈", name:"Compétent",      desc:"Moyenne générale ≥ 70%",             color:"#3b82f6", check:(s)=>s.avg>=70&&s.total>=3 },
+  { id:"avg85",   icon:"🔥", name:"Expert",         desc:"Moyenne générale ≥ 85%",             color:"#f07320", check:(s)=>s.avg>=85&&s.total>=5 },
+  { id:"avg95",   icon:"💎", name:"Maître",         desc:"Moyenne générale ≥ 95%",             color:"#e8392a", check:(s)=>s.avg>=95&&s.total>=10 },
+  { id:"perfect", icon:"🏆", name:"Sans faute",     desc:"Score parfait 100% sur un examen",  color:"#eab308", check:(s)=>s.perfect },
+  { id:"poly",    icon:"🌐", name:"Polyvalent",     desc:"Examen dans toutes les catégories",  color:"#a855f7", check:(s,cats)=>cats.length>0&&s.uniqueCats>=cats.length },
 ];
 
 const computeStats = results => ({
-  total:    results.length,
-  correct:  results.reduce((a,r)=>a+(r.score||0),0),
-  avg:      results.length ? Math.round(results.reduce((a,r)=>a+r.pct,0)/results.length) : 0,
-  perfect:  results.some(r=>r.pct===100),
+  total:      results.length,
+  correct:    results.reduce((a,r)=>a+(r.score||0),0),
+  avg:        results.length ? Math.round(results.reduce((a,r)=>a+r.pct,0)/results.length) : 0,
+  perfect:    results.some(r=>r.pct===100),
   uniqueCats: new Set(results.map(r=>r.cat_id).filter(Boolean)).size,
 });
 const getUnlocked = (results, cats) => {
@@ -81,75 +81,56 @@ const getUnlocked = (results, cats) => {
   return BADGES.filter(b=>b.check(s, cats));
 };
 
-// ─── COMPOSANTS UI ───────────────────────────────────────────────
+// ─── UI ──────────────────────────────────────────────────────────
 const FL = ({children}) => (
   <label style={{display:"block",fontSize:11,fontWeight:700,color:C.muted,letterSpacing:2,textTransform:"uppercase",marginBottom:8,fontFamily:"'Barlow',sans-serif"}}>{children}</label>
 );
-
 const Field = ({value,onChange,placeholder,type="text",rows,onKeyDown,autoFocus,disabled}) => {
-  const s = {width:"100%",background:C.surf,border:`1px solid ${C.border2}`,borderRadius:4,color:C.text,padding:"11px 14px",fontSize:14,fontFamily:"'Barlow',sans-serif",outline:"none",boxSizing:"border-box",transition:"border-color 0.2s",opacity:disabled?0.6:1};
+  const s={width:"100%",background:C.surf,border:`1px solid ${C.border2}`,borderRadius:4,color:C.text,padding:"11px 14px",fontSize:14,fontFamily:"'Barlow',sans-serif",outline:"none",boxSizing:"border-box",opacity:disabled?0.6:1};
   if(rows) return <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} disabled={disabled} style={{...s,resize:"vertical"}}/>;
   return <input type={type} value={value} onChange={onChange} placeholder={placeholder} onKeyDown={onKeyDown} autoFocus={autoFocus} disabled={disabled} style={s}/>;
 };
-
 const Btn = ({onClick,children,color=C.red,disabled,full,ghost,sm,danger}) => {
-  const bg = danger ? "#3a0e0a" : ghost ? "transparent" : disabled ? "#16161c" : color;
-  const col = danger ? C.red : ghost ? C.muted : disabled ? "#40404a" : (color===C.greenL||color===C.green?"#000":"#fff");
-  return (
-    <button onClick={onClick} disabled={disabled} style={{
-      width:full?"100%":undefined, background:bg, color:col,
-      border:ghost?`1px solid ${C.border2}`:danger?`1px solid #5a1e18`:"none",
-      borderRadius:4, padding:sm?"5px 14px":"11px 24px",
-      cursor:disabled?"default":"pointer", fontWeight:700, fontSize:sm?12:14,
-      fontFamily:"'Barlow',sans-serif", transition:"all 0.15s",
-      boxShadow:(!ghost&&!disabled&&!danger)?`0 2px 12px ${color}33`:"none",
-      display:"inline-flex", alignItems:"center", gap:6,
-    }}>{children}</button>
-  );
+  const bg=danger?"#3a0e0a":ghost?"transparent":disabled?"#16161c":color;
+  const col=danger?C.red:ghost?C.muted:disabled?"#40404a":(color===C.greenL||color===C.green?"#000":"#fff");
+  return <button onClick={onClick} disabled={disabled} style={{width:full?"100%":undefined,background:bg,color:col,border:ghost?`1px solid ${C.border2}`:danger?`1px solid #5a1e18`:"none",borderRadius:4,padding:sm?"5px 14px":"11px 24px",cursor:disabled?"default":"pointer",fontWeight:700,fontSize:sm?12:14,fontFamily:"'Barlow',sans-serif",transition:"all 0.15s",boxShadow:(!ghost&&!disabled&&!danger)?`0 2px 12px ${color}33`:"none",display:"inline-flex",alignItems:"center",gap:6}}>{children}</button>;
 };
-
 const ScorePill = ({pct,lg}) => {
-  const col = pct2col(pct);
+  const col=pct2col(pct);
   return <span style={{fontSize:lg?26:13,padding:lg?"8px 18px":"3px 10px",color:col,border:`1px solid ${col}44`,borderRadius:4,fontFamily:"Oswald,sans-serif",fontWeight:700,background:col+"14"}}>{pct}%</span>;
 };
-
 const Topbar = ({title,back,right}) => (
   <div style={{background:C.surf+"ee",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
     <div style={{display:"flex",alignItems:"center",gap:12}}>
-      {back&&<button onClick={back} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:18,padding:"4px 8px 4px 0",lineHeight:1}} onMouseEnter={e=>e.currentTarget.style.color=C.text} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>←</button>}
+      {back&&<button onClick={back} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:18,padding:"4px 8px 4px 0"}} onMouseEnter={e=>e.currentTarget.style.color=C.text} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>←</button>}
       <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:3,textTransform:"uppercase"}}>{title}</span>
     </div>
     <div style={{display:"flex",alignItems:"center",gap:8}}>{right}</div>
   </div>
 );
-
 const Wrap = ({children}) => <div style={{fontFamily:"'Barlow',sans-serif",background:C.bg,minHeight:"100vh",color:C.text}}>{children}</div>;
-
 const ErrBox = ({msg}) => msg?<div style={{color:"#fca5a5",fontSize:13,background:"rgba(220,38,38,0.08)",border:"1px solid rgba(220,38,38,0.25)",borderRadius:4,padding:"10px 14px",marginBottom:12,lineHeight:1.5}}>{msg}</div>:null;
 const OkBox  = ({msg}) => msg?<div style={{color:"#86efac",fontSize:13,background:"rgba(22,163,74,0.08)",border:"1px solid rgba(22,163,74,0.25)",borderRadius:4,padding:"10px 14px",marginBottom:12}}>{msg}</div>:null;
-
-const StatCard = ({label,value,sub,color=C.text}) => (
+const StatCard = ({label,value,color=C.text}) => (
   <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:6,padding:"18px 20px",textAlign:"center"}}>
     <div style={{fontFamily:"Oswald,sans-serif",fontSize:32,fontWeight:700,color,lineHeight:1}}>{value}</div>
-    {sub&&<div style={{color:C.muted,fontSize:11,marginTop:4}}>{sub}</div>}
     <div style={{color:C.text2,fontSize:12,marginTop:6}}>{label}</div>
   </div>
 );
-
 const BadgeCard = ({badge,unlocked}) => (
   <div title={badge.desc} style={{background:unlocked?C.card:C.surf,border:`1px solid ${unlocked?badge.color+"44":C.border}`,borderRadius:6,padding:"14px",textAlign:"center",opacity:unlocked?1:0.4,transition:"all 0.2s",position:"relative",overflow:"hidden"}}>
     {unlocked&&<div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 0%, ${badge.color}18 0%, transparent 60%)`}}/>}
     <div style={{fontSize:28,marginBottom:8}}>{badge.icon}</div>
     <div style={{fontSize:11,fontWeight:700,color:unlocked?badge.color:C.muted,fontFamily:"Oswald,sans-serif",letterSpacing:1,textTransform:"uppercase"}}>{badge.name}</div>
     <div style={{fontSize:10,color:C.muted,marginTop:4,lineHeight:1.4}}>{badge.desc}</div>
-    {unlocked&&<div style={{marginTop:8,width:6,height:6,borderRadius:"50%",background:badge.color,margin:"8px auto 0",boxShadow:`0 0 8px ${badge.color}`}}/>}
+    {unlocked&&<div style={{width:6,height:6,borderRadius:"50%",background:badge.color,margin:"8px auto 0",boxShadow:`0 0 8px ${badge.color}`}}/>}
   </div>
 );
 
 // ─── FORMULAIRES ─────────────────────────────────────────────────
 function QForm({initial,cats,qs,onSave,onCancel,saving,saveErr}) {
-  const [q,setQ] = useState(initial);
-  const valid = q.text?.trim()&&q.catId&&q.opts?.every(o=>o?.trim());
+  const [q,setQ]=useState(initial);
+  const valid=q.text?.trim()&&q.catId&&q.opts?.every(o=>o?.trim());
   return (
     <div style={{maxWidth:700}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:28}}>
@@ -163,7 +144,7 @@ function QForm({initial,cats,qs,onSave,onCancel,saving,saveErr}) {
             {cats.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
-        <div><FL>Intitulé de la question *</FL><Field value={q.text||""} onChange={e=>setQ(x=>({...x,text:e.target.value}))} placeholder="Saisissez votre question..." rows={3}/></div>
+        <div><FL>Intitulé *</FL><Field value={q.text||""} onChange={e=>setQ(x=>({...x,text:e.target.value}))} placeholder="Saisissez votre question..." rows={3}/></div>
         <div>
           <FL>Options — cliquez la lettre pour définir la bonne réponse *</FL>
           {(q.opts||[]).map((opt,i)=>(
@@ -181,8 +162,8 @@ function QForm({initial,cats,qs,onSave,onCancel,saving,saveErr}) {
 }
 
 function CatForm({initial,cats,onSave,onCancel,saving,saveErr}) {
-  const [cat,setCat] = useState(initial);
-  const valid = cat.name?.trim();
+  const [cat,setCat]=useState(initial);
+  const valid=cat.name?.trim();
   return (
     <div style={{maxWidth:500}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:28}}>
@@ -205,11 +186,11 @@ function CatForm({initial,cats,onSave,onCancel,saving,saveErr}) {
 }
 
 function DocForm({initial,cats,docs,onSave,onCancel,saving,saveErr}) {
-  const [d,setD]   = useState(initial);
-  const [file,setFile] = useState(null);
-  const [upl,setUpl]   = useState(false);
-  const fileRef = useRef();
-  const valid = d.title?.trim()&&d.catId&&d.type;
+  const [d,setD]=useState(initial);
+  const [file,setFile]=useState(null);
+  const [upl,setUpl]=useState(false);
+  const fileRef=useRef();
+  const valid=d.title?.trim()&&d.catId&&d.type;
   return (
     <div style={{maxWidth:600}}>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:28}}>
@@ -248,7 +229,7 @@ function DocForm({initial,cats,docs,onSave,onCancel,saving,saveErr}) {
   );
 }
 
-// ─── APP PRINCIPAL ───────────────────────────────────────────────
+// ─── APP ─────────────────────────────────────────────────────────
 export default function App() {
   const [page,setPage]           = useState("boot");
   const [user,setUser]           = useState(null);
@@ -260,17 +241,15 @@ export default function App() {
   const [docs,setDocs]           = useState([]);
   const [myResults,setMyResults] = useState([]);
   const [allResults,setAllResults] = useState([]);
-  const [wrongIds,setWrongIds]   = useState(new Set()); // IDs questions ratées
+  const [wrongIds,setWrongIds]   = useState(new Set());
 
-  // Auth
-  const [authMode,setAuthMode] = useState("login");
-  const [aEmail,setAEmail]     = useState("");
-  const [aPw,setAPw]           = useState("");
-  const [aPseudo,setAPseudo]   = useState("");
-  const [aErr,setAErr]         = useState("");
-  const [aBusy,setABusy]       = useState(false);
+  const [authMode,setAuthMode]   = useState("login");
+  const [aEmail,setAEmail]       = useState("");
+  const [aPw,setAPw]             = useState("");
+  const [aPseudo,setAPseudo]     = useState("");
+  const [aErr,setAErr]           = useState("");
+  const [aBusy,setABusy]         = useState(false);
 
-  // Admin
   const [adminTab,setAdminTab]       = useState("qs");
   const [editQ,setEditQ]             = useState(null);
   const [editCat,setEditCat]         = useState(null);
@@ -280,17 +259,15 @@ export default function App() {
   const [saveErr,setSaveErr]         = useState("");
   const [classFilter,setClassFilter] = useState("all");
 
-  // Resources
-  const [resCat,setResCat] = useState("all");
+  const [resCat,setResCat]       = useState("all");
 
-  // Settings
   const [newPseudo,setNewPseudo] = useState(""); const [pseudoOk,setPseudoOk] = useState(false);
-  const [newPw,setNewPw]         = useState(""); const [newPw2,setNewPw2] = useState("");
-  const [pwOk,setPwOk]           = useState(false); const [pwErr,setPwErr] = useState("");
+  const [newPw,setNewPw]         = useState(""); const [newPw2,setNewPw2]     = useState("");
+  const [pwOk,setPwOk]           = useState(false); const [pwErr,setPwErr]   = useState("");
 
-  // Exam
+  // Exam state
   const [examCat,setExamCat]     = useState(null);
-  const [examMode,setExamMode]   = useState("cat");   // "cat" | "all" | "revision"
+  const [examMode,setExamMode]   = useState("cat");
   const [examList,setExamList]   = useState([]);
   const [examIdx,setExamIdx]     = useState(0);
   const [picked,setPicked]       = useState(null);
@@ -298,63 +275,72 @@ export default function App() {
   const [log,setLog]             = useState([]);
   const answersRef               = useRef([]);
 
-  // Pre-exam config
-  const [preExam,setPreExam]     = useState(null);  // { cat, mode }
+  // Pre-exam
+  const [preExam,setPreExam]     = useState(null);
   const [examCount,setExamCount] = useState(20);
   const [timerOn,setTimerOn]     = useState(false);
-  const [timeLeft,setTimeLeft]   = useState(TIMER_DEFAULT);
-  const timerRef                 = useRef(null);
 
-  // New badges after exam
+  // Timers
+  const [timeLeft,setTimeLeft]   = useState(TIMER_DEFAULT);    // par question
+  const [globalTime,setGlobalTime] = useState(EXAMEN_BLANC_TIMER); // global examen blanc
+  const timerRef                 = useRef(null);
+  const globalTimerRef           = useRef(null);
+
   const [newBadges,setNewBadges] = useState([]);
 
   // ── BOOT ─────────────────────────────────────────────────────
   useEffect(()=>{
-    // Fonts
     if(!document.querySelector("#gf-sp")){
       const l=document.createElement("link");l.id="gf-sp";l.rel="stylesheet";
       l.href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow:wght@300;400;500;600;700&display=swap";
       document.head.appendChild(l);
     }
-    // ① Vérifier session existante d'abord (corrige le bug "toujours sur auth")
+    let handled=false;
     sb.auth.getSession().then(({data:{session}})=>{
-      if(session?.user) onSession(session.user);
-      else setPage("auth");
-    });
-    // ② Écouter les changements ensuite
-    const {data:{subscription}} = sb.auth.onAuthStateChange(async(event,session)=>{
-      if(event==="SIGNED_OUT"){ setUser(null);setIsAdmin(false);setPseudo("");setPage("auth"); }
-      else if(event==="SIGNED_IN"&&session?.user){ await onSession(session.user); }
+      if(session?.user&&!handled){handled=true;onSession(session.user);}
+      else if(!session) setPage("auth");
+    }).catch(()=>setPage("auth"));
+    const {data:{subscription}}=sb.auth.onAuthStateChange(async(event,session)=>{
+      if(event==="SIGNED_OUT"){handled=false;setUser(null);setIsAdmin(false);setPseudo("");setPage("auth");}
+      else if(event==="SIGNED_IN"&&session?.user&&!handled){handled=true;await onSession(session.user);}
     });
     return ()=>subscription.unsubscribe();
   },[]);
 
-  // Timer
+  // Timer par question (modes cat et révision)
   useEffect(()=>{
-    if(page!=="exam"||!timerOn||shown) return;
+    if(page!=="exam"||examMode==="all"||!timerOn||shown) return;
     setTimeLeft(TIMER_DEFAULT);
-    timerRef.current = setInterval(()=>{
-      setTimeLeft(t=>{
-        if(t<=1){ clearInterval(timerRef.current); if(picked===null) setPicked(-1); return 0; }
+    timerRef.current=setInterval(()=>{
+      setTimeLeft(t=>{ if(t<=1){clearInterval(timerRef.current);return 0;} return t-1; });
+    },1000);
+    return ()=>clearInterval(timerRef.current);
+  },[examIdx,page,timerOn,examMode]);
+
+  useEffect(()=>{ if(timerOn&&shown) clearInterval(timerRef.current); },[shown]);
+  useEffect(()=>{ if(timerOn&&timeLeft===0&&!shown&&examMode!=="all") doValidate(-1); },[timeLeft]);
+
+  // Timer global Examen Blanc (60 min)
+  useEffect(()=>{
+    if(page!=="exam"||examMode!=="all") return;
+    globalTimerRef.current=setInterval(()=>{
+      setGlobalTime(t=>{
+        if(t<=1){
+          clearInterval(globalTimerRef.current);
+          // Forcer fin de l'examen
+          finishExam();
+          return 0;
+        }
         return t-1;
       });
     },1000);
-    return ()=>clearInterval(timerRef.current);
-  },[examIdx,page,timerOn]);
+    return ()=>clearInterval(globalTimerRef.current);
+  },[page,examMode]);
 
-  useEffect(()=>{
-    if(timerOn&&shown) clearInterval(timerRef.current);
-  },[shown]);
-
-  // Auto-validate quand timer expire
-  useEffect(()=>{
-    if(timerOn&&timeLeft===0&&!shown) doValidate(-1);
-  },[timeLeft]);
-
-  // Avertissement quitter examen
+  // Avertissement quitter
   useEffect(()=>{
     if(page==="exam"){
-      const h = e=>{ e.preventDefault(); e.returnValue=""; };
+      const h=e=>{e.preventDefault();e.returnValue="";};
       window.addEventListener("beforeunload",h);
       return ()=>window.removeEventListener("beforeunload",h);
     }
@@ -362,15 +348,18 @@ export default function App() {
 
   // ── SESSION ──────────────────────────────────────────────────
   const onSession = async u=>{
-    setUser(u);
-    const {data:prof} = await sb.from("profiles").select("*").eq("id",u.id).single();
-    if(prof){ setIsAdmin(prof.is_admin); setPseudo(prof.pseudo||u.email.split("@")[0]); }
-    await Promise.all([loadData(),loadMyResults(u.id)]);
-    setPage("home");
+    try{
+      setUser(u);
+      const {data:prof}=await sb.from("profiles").select("*").eq("id",u.id).single();
+      if(prof){setIsAdmin(prof.is_admin);setPseudo(prof.pseudo||u.email.split("@")[0]);}
+      else setPseudo(u.email.split("@")[0]);
+      await Promise.all([loadData(),loadMyResults(u.id)]);
+      setPage("home");
+    }catch(e){console.error(e);setPage("auth");}
   };
 
-  const loadData = async()=>{
-    const [cR,qR,dR] = await Promise.all([
+  const loadData=async()=>{
+    const [cR,qR,dR]=await Promise.all([
       sb.from("categories").select("*").order("created_at"),
       sb.from("questions").select("*").order("created_at"),
       sb.from("documents").select("*").order("created_at"),
@@ -380,130 +369,156 @@ export default function App() {
     if(dR.data) setDocs(dR.data.map(d=>({id:d.id,catId:d.cat_id,title:d.title,type:d.type,description:d.description,url:d.url})));
   };
 
-  const loadMyResults = async uid=>{
-    const {data} = await sb.from("results").select("*").eq("user_id",uid).order("created_at",{ascending:false});
+  const loadMyResults=async uid=>{
+    const {data}=await sb.from("results").select("*").eq("user_id",uid).order("created_at",{ascending:false});
     if(data) setMyResults(data);
-    // Charger les questions ratées depuis localStorage
-    try{
-      const stored = JSON.parse(localStorage.getItem(`wrong_${uid}`)||"[]");
-      setWrongIds(new Set(stored));
-    }catch{}
+    try{const stored=JSON.parse(localStorage.getItem(`wrong_${uid}`)||"[]");setWrongIds(new Set(stored));}catch{}
   };
 
-  const loadAllResults = async()=>{
-    const {data} = await sb.from("results").select("*").order("created_at",{ascending:false}).limit(500);
+  const loadAllResults=async()=>{
+    const {data}=await sb.from("results").select("*").order("created_at",{ascending:false}).limit(500);
     if(data) setAllResults(data);
   };
 
   // ── AUTH ─────────────────────────────────────────────────────
-  const doAuth = async()=>{
-    setAErr(""); setABusy(true);
+  const doAuth=async()=>{
+    setAErr("");setABusy(true);
     try{
       if(authMode==="login"){
-        const {error} = await sb.auth.signInWithPassword({email:aEmail,password:aPw});
+        const {error}=await sb.auth.signInWithPassword({email:aEmail,password:aPw});
         if(error) setAErr(tr(error.message));
       } else {
         if(!aPseudo.trim()){setAErr("Veuillez entrer un prénom ou pseudo.");setABusy(false);return;}
-        const {data,error} = await sb.auth.signUp({email:aEmail,password:aPw,options:{data:{pseudo:aPseudo.trim()}}});
+        const {data,error}=await sb.auth.signUp({email:aEmail,password:aPw,options:{data:{pseudo:aPseudo.trim()}}});
         if(error) setAErr(tr(error.message));
         else if(!data.session) setAErr("✓ Compte créé ! Connectez-vous maintenant.");
       }
     }catch(e){setAErr(tr(e.message));}
     setABusy(false);
   };
-
-  const doLogout = ()=>sb.auth.signOut();
+  const doLogout=()=>sb.auth.signOut();
 
   // ── CRUD ─────────────────────────────────────────────────────
-  const saveCat = async data=>{
+  const saveCat=async data=>{
     setSaving(true);setSaveErr("");
     const payload={name:data.name,description:data.desc||"",color:data.color};
     if(cats.some(c=>c.id===data.id)){
-      const {error} = await sb.from("categories").update(payload).eq("id",data.id);
+      const {error}=await sb.from("categories").update(payload).eq("id",data.id);
       if(!error){setCats(p=>p.map(c=>c.id===data.id?{...c,...data}:c));setEditCat(null);}
       else setSaveErr(error.message);
     } else {
-      const {data:nc,error} = await sb.from("categories").insert(payload).select().single();
+      const {data:nc,error}=await sb.from("categories").insert(payload).select().single();
       if(!error&&nc){setCats(p=>[...p,{id:nc.id,name:nc.name,desc:nc.description,color:nc.color}]);setEditCat(null);}
       else setSaveErr(error?.message||"Erreur");
     }
     setSaving(false);
   };
-  const deleteCat = async id=>{
-    const {error} = await sb.from("categories").delete().eq("id",id);
+  const deleteCat=async id=>{
+    const {error}=await sb.from("categories").delete().eq("id",id);
     if(!error){setCats(p=>p.filter(c=>c.id!==id));setQs(p=>p.filter(q=>q.catId!==id));setDocs(p=>p.filter(d=>d.catId!==id));setDelConfirm(null);}
   };
-  const saveQ = async data=>{
+  const saveQ=async data=>{
     setSaving(true);setSaveErr("");
     const payload={cat_id:data.catId,text:data.text,options:data.opts,correct_index:data.correct,explanation:data.expl||""};
     if(qs.some(q=>q.id===data.id)){
-      const {error} = await sb.from("questions").update(payload).eq("id",data.id);
+      const {error}=await sb.from("questions").update(payload).eq("id",data.id);
       if(!error){setQs(p=>p.map(q=>q.id===data.id?{...q,...data}:q));setEditQ(null);}
       else setSaveErr(error.message);
     } else {
-      const {data:nq,error} = await sb.from("questions").insert(payload).select().single();
+      const {data:nq,error}=await sb.from("questions").insert(payload).select().single();
       if(!error&&nq){setQs(p=>[...p,{id:nq.id,catId:nq.cat_id,text:nq.text,opts:nq.options,correct:nq.correct_index,expl:nq.explanation}]);setEditQ(null);}
       else setSaveErr(error?.message||"Erreur");
     }
     setSaving(false);
   };
-  const deleteQ = async id=>{
-    const {error} = await sb.from("questions").delete().eq("id",id);
+  const deleteQ=async id=>{
+    const {error}=await sb.from("questions").delete().eq("id",id);
     if(!error){setQs(p=>p.filter(q=>q.id!==id));setDelConfirm(null);}
   };
-  const saveDoc = async(data,file,setUploading)=>{
+  const saveDoc=async(data,file,setUploading)=>{
     setSaving(true);setSaveErr("");
     let finalUrl=data.url||"";
     if(file){
       setUploading(true);
       const ext=file.name.split(".").pop();
       const path=`${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const {data:up,error:upErr} = await sb.storage.from("documents").upload(path,file);
+      const {data:up,error:upErr}=await sb.storage.from("documents").upload(path,file);
       if(upErr){setSaveErr("Erreur upload : "+upErr.message);setSaving(false);setUploading(false);return;}
-      const {data:{publicUrl}} = sb.storage.from("documents").getPublicUrl(up.path);
+      const {data:{publicUrl}}=sb.storage.from("documents").getPublicUrl(up.path);
       finalUrl=publicUrl;setUploading(false);
     }
     const payload={cat_id:data.catId,title:data.title,type:data.type,description:data.description||"",url:finalUrl};
     if(docs.some(d=>d.id===data.id)){
-      const {error} = await sb.from("documents").update(payload).eq("id",data.id);
+      const {error}=await sb.from("documents").update(payload).eq("id",data.id);
       if(!error){setDocs(p=>p.map(d=>d.id===data.id?{...d,...data,url:finalUrl}:d));setEditDoc(null);}
       else setSaveErr(error.message);
     } else {
-      const {data:nd,error} = await sb.from("documents").insert(payload).select().single();
+      const {data:nd,error}=await sb.from("documents").insert(payload).select().single();
       if(!error&&nd){setDocs(p=>[...p,{id:nd.id,catId:nd.cat_id,title:nd.title,type:nd.type,description:nd.description,url:nd.url}]);setEditDoc(null);}
       else setSaveErr(error?.message||"Erreur");
     }
     setSaving(false);
   };
-  const deleteDoc = async id=>{
-    const {error} = await sb.from("documents").delete().eq("id",id);
+  const deleteDoc=async id=>{
+    const {error}=await sb.from("documents").delete().eq("id",id);
     if(!error){setDocs(p=>p.filter(d=>d.id!==id));setDelConfirm(null);}
   };
 
   // ── EXAM ─────────────────────────────────────────────────────
-  const openPreExam = (cat,mode="cat")=>{ setPreExam({cat,mode}); setExamCount(20); setTimerOn(false); };
+  const openPreExam=(cat,mode="cat")=>{
+    setPreExam({cat,mode});
+    setExamCount(mode==="all"?EXAMEN_BLANC_MAX:20);
+    setTimerOn(false);
+  };
 
-  const startExam = ()=>{
+  const startExam=()=>{
     if(!preExam) return;
-    const {cat,mode} = preExam;
-    let pool = [];
-    if(mode==="cat")      pool = qs.filter(q=>q.catId===cat.id);
-    else if(mode==="all") pool = [...qs];
-    else if(mode==="revision") pool = qs.filter(q=>wrongIds.has(q.id));
-
+    const {cat,mode}=preExam;
+    let pool=[];
+    if(mode==="cat")      pool=qs.filter(q=>q.catId===cat.id);
+    else if(mode==="all") pool=[...qs];
+    else if(mode==="revision") pool=qs.filter(q=>wrongIds.has(q.id));
     if(!pool.length) return;
-    const shuffled = pool.sort(()=>Math.random()-0.5).slice(0,examCount);
+    const max = mode==="all" ? EXAMEN_BLANC_MAX : examCount;
+    const shuffled=pool.sort(()=>Math.random()-0.5).slice(0,max);
     answersRef.current=[];
-    setExamCat(cat); setExamMode(mode); setExamList(shuffled);
-    setExamIdx(0); setPicked(null); setShown(false); setLog([]);
+    setExamCat(cat);setExamMode(mode);setExamList(shuffled);
+    setExamIdx(0);setPicked(null);setShown(false);setLog([]);
+    setGlobalTime(EXAMEN_BLANC_TIMER);
     setPreExam(null);
     setPage("exam");
   };
 
-  const doValidate = (forcePick=null)=>{
-    const choice = forcePick!==null ? forcePick : picked;
+  const finishExam=useCallback(async(forceAnswers)=>{
+    clearInterval(globalTimerRef.current);
+    clearInterval(timerRef.current);
+    const answers=forceAnswers||answersRef.current;
+    const sc=answers.filter(x=>x.correct).length;
+    const total=examList.length;
+    const pct=Math.round((sc/total)*100);
+    const newWrong=new Set(wrongIds);
+    answers.forEach(a=>{if(!a.correct)newWrong.add(a.qId);else newWrong.delete(a.qId);});
+    setWrongIds(newWrong);
+    try{localStorage.setItem(`wrong_${user.id}`,JSON.stringify([...newWrong]));}catch{}
+    await sb.from("results").insert({
+      user_id:user.id,pseudo,
+      cat_id:examMode==="all"?null:examCat?.id,
+      cat_name:examMode==="all"?"Examen Blanc":examMode==="revision"?"Mode révision":examCat?.name,
+      color:examMode==="all"?"#e8392a":examCat?.color,
+      score:sc,total,pct
+    });
+    const oldBadges=getUnlocked(myResults,cats).map(b=>b.id);
+    const newRes=[...myResults,{score:sc,total,pct,cat_id:examCat?.id}];
+    const newUnlocked=getUnlocked(newRes,cats).filter(b=>!oldBadges.includes(b.id));
+    setNewBadges(newUnlocked);
+    await loadMyResults(user.id);
+    setPage("results");
+  },[answersRef,examList,examMode,examCat,wrongIds,user,pseudo,myResults,cats]);
+
+  const doValidate=(forcePick=null)=>{
+    const choice=forcePick!==null?forcePick:picked;
     if(choice===null) return;
-    const isCorrect = choice===examList[examIdx].correct;
+    const isCorrect=choice===examList[examIdx].correct;
     const entry={correct:isCorrect,picked:choice,qId:examList[examIdx].id};
     answersRef.current=[...answersRef.current,entry];
     setLog([...answersRef.current]);
@@ -511,56 +526,31 @@ export default function App() {
     clearInterval(timerRef.current);
   };
 
-  const validate = ()=>doValidate();
-
-  const nextQ = async()=>{
+  const nextQ=async()=>{
     if(examIdx+1>=examList.length){
-      // Calcul résultat
-      const answers=answersRef.current;
-      const sc=answers.filter(x=>x.correct).length;
-      const pct=Math.round((sc/examList.length)*100);
-      // Sauvegarder mauvaises réponses dans localStorage
-      const newWrong = new Set(wrongIds);
-      answers.forEach(a=>{ if(!a.correct) newWrong.add(a.qId); else newWrong.delete(a.qId); });
-      setWrongIds(newWrong);
-      try{ localStorage.setItem(`wrong_${user.id}`,JSON.stringify([...newWrong])); }catch{}
-      // Sauvegarder en DB
-      await sb.from("results").insert({
-        user_id:user.id, pseudo,
-        cat_id: examMode==="all" ? null : examCat?.id,
-        cat_name: examMode==="all" ? "Toutes catégories" : examMode==="revision" ? "Mode révision" : examCat?.name,
-        color: examMode==="all" ? "#e8392a" : examCat?.color,
-        score:sc, total:examList.length, pct
-      });
-      // Détecter nouveaux badges
-      const oldBadges = getUnlocked(myResults,cats).map(b=>b.id);
-      const newRes = [...myResults,{score:sc,total:examList.length,pct,cat_id:examCat?.id}];
-      const newUnlocked = getUnlocked(newRes,cats).filter(b=>!oldBadges.includes(b.id));
-      setNewBadges(newUnlocked);
-      await loadMyResults(user.id);
-      setPage("results");
+      await finishExam();
     } else {
-      setExamIdx(i=>i+1); setPicked(null); setShown(false);
+      setExamIdx(i=>i+1);setPicked(null);setShown(false);
     }
   };
 
   // ── SETTINGS ─────────────────────────────────────────────────
-  const savePseudo = async()=>{
+  const savePseudo=async()=>{
     if(!newPseudo.trim()) return;
-    const {error} = await sb.from("profiles").update({pseudo:newPseudo.trim()}).eq("id",user.id);
+    const {error}=await sb.from("profiles").update({pseudo:newPseudo.trim()}).eq("id",user.id);
     if(!error){setPseudo(newPseudo.trim());setNewPseudo("");setPseudoOk(true);setTimeout(()=>setPseudoOk(false),3000);}
   };
-  const savePw = async()=>{
+  const savePw=async()=>{
     setPwErr("");
     if(newPw.length<6){setPwErr("Minimum 6 caractères.");return;}
     if(newPw!==newPw2){setPwErr("Les mots de passe ne correspondent pas.");return;}
-    const {error} = await sb.auth.updateUser({password:newPw});
+    const {error}=await sb.auth.updateUser({password:newPw});
     if(!error){setNewPw("");setNewPw2("");setPwOk(true);setTimeout(()=>setPwOk(false),3000);}
     else setPwErr(tr(error.message));
   };
 
   // ─────────────────────────────────────────────────────────────
-  //  PAGES
+  // PAGES
   // ─────────────────────────────────────────────────────────────
 
   if(page==="boot") return (
@@ -578,8 +568,8 @@ export default function App() {
       <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse at 50% 0%, rgba(232,57,42,0.08) 0%, transparent 60%)`}}>
         <div style={{width:"100%",maxWidth:380}}>
           <div style={{textAlign:"center",marginBottom:40}}>
-            <div style={{fontSize:52,marginBottom:20,lineHeight:1,filter:"drop-shadow(0 0 28px rgba(232,57,42,0.5))"}}>🔥</div>
-<h1 style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(24px,6vw,44px)",fontWeight:700,letterSpacing:5,textTransform:"uppercase",margin:"0 0 10px",color:C.text,lineHeight:1.2}}>SAPEURS-POMPIERS</h1>
+            <div style={{fontSize:56,marginBottom:20,filter:"drop-shadow(0 0 28px rgba(232,57,42,0.5))"}}>🔥</div>
+            <h1 style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(24px,6vw,44px)",fontWeight:700,letterSpacing:5,textTransform:"uppercase",margin:"0 0 10px",color:C.text}}>SAPEURS-POMPIERS</h1>
             <div style={{fontFamily:"Oswald,sans-serif",color:C.red,letterSpacing:5,textTransform:"uppercase",fontSize:11}}>Plateforme QCM · Formation</div>
           </div>
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:"36px 32px",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
@@ -601,46 +591,62 @@ export default function App() {
     </Wrap>
   );
 
-  // ── PRE-EXAM MODAL ─────────────────────────────────────────
-  if(preExam) {
-    const {cat,mode} = preExam;
-    const pool = mode==="cat" ? qs.filter(q=>q.catId===cat?.id) : mode==="revision" ? qs.filter(q=>wrongIds.has(q.id)) : qs;
-    const maxQ = pool.length;
+  // ── PRE-EXAM ───────────────────────────────────────────────
+  if(preExam){
+    const {cat,mode}=preExam;
+    const pool=mode==="cat"?qs.filter(q=>q.catId===cat?.id):mode==="revision"?qs.filter(q=>wrongIds.has(q.id)):qs;
+    const maxQ=mode==="all"?Math.min(pool.length,EXAMEN_BLANC_MAX):pool.length;
+    const accentColor=mode==="all"?C.red:mode==="revision"?C.orange:cat?.color||C.red;
     return (
       <Wrap>
         <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${mode==="revision"?C.orange:mode==="all"?C.purple:cat?.color||C.red}`,borderRadius:8,padding:"36px 32px",width:"100%",maxWidth:420,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${accentColor}`,borderRadius:8,padding:"36px 32px",width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
             <div style={{marginBottom:28}}>
-              <div style={{fontFamily:"Oswald,sans-serif",fontSize:20,letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>
-                {mode==="all"?"🌐 Toutes les catégories":mode==="revision"?"🔄 Mode révision":cat?.name}
+              <div style={{fontFamily:"Oswald,sans-serif",fontSize:22,letterSpacing:2,textTransform:"uppercase",marginBottom:8,color:accentColor}}>
+                {mode==="all"?"📋 Examen Blanc":mode==="revision"?"🔄 Mode révision":cat?.name}
               </div>
-              <div style={{color:C.muted,fontSize:14}}>{maxQ} question{maxQ!==1?"s":""} disponible{maxQ!==1?"s":""}</div>
+              <div style={{color:C.muted,fontSize:14}}>
+                {mode==="all"?`${maxQ} questions · Durée max 60 minutes`:`${pool.length} question${pool.length!==1?"s":""} disponible${pool.length!==1?"s":""}`}
+              </div>
             </div>
-            <div style={{display:"flex",flexDirection:"column",gap:20}}>
-              <div>
-                <FL>Nombre de questions</FL>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                  {EXAM_COUNTS.filter(n=>n<=maxQ).concat(maxQ>50?[]:[]).map(n=>(
-                    <button key={n} onClick={()=>setExamCount(n)} style={{flex:1,minWidth:60,background:examCount===n?C.red:"transparent",color:examCount===n?"#fff":C.muted,border:`1px solid ${examCount===n?C.red:C.border2}`,borderRadius:4,padding:"9px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:15,transition:"all 0.15s"}}>
-                      {n}
-                    </button>
-                  ))}
-                  {maxQ>0&&<button onClick={()=>setExamCount(maxQ)} style={{flex:1,minWidth:60,background:examCount===maxQ?C.red:"transparent",color:examCount===maxQ?"#fff":C.muted,border:`1px solid ${examCount===maxQ?C.red:C.border2}`,borderRadius:4,padding:"9px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:13,transition:"all 0.15s"}}>Tout ({maxQ})</button>}
+
+            {mode==="all"?(
+              // Examen Blanc : fixé à 40 questions max, timer global 60 min
+              <div style={{background:C.surf,border:`1px solid ${C.border2}`,borderRadius:6,padding:"16px 20px",marginBottom:24}}>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <span style={{fontSize:24}}>⏱</span>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:15,color:C.text}}>60 minutes au total</div>
+                    <div style={{color:C.muted,fontSize:12,marginTop:2}}>{maxQ} questions · Chronomètre global automatique</div>
+                  </div>
                 </div>
               </div>
-              <div>
-                <FL>Chronomètre (optionnel)</FL>
-                <button onClick={()=>setTimerOn(t=>!t)} style={{width:"100%",background:timerOn?"#1a1208":"transparent",color:timerOn?C.yellowL:C.muted,border:`1px solid ${timerOn?C.yellowL:C.border2}`,borderRadius:4,padding:"11px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14,transition:"all 0.15s",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <span>⏱ {TIMER_DEFAULT}s par question</span>
-                  <span style={{fontSize:11,background:timerOn?C.yellowL:C.faint,color:timerOn?"#000":C.muted,padding:"2px 10px",borderRadius:20}}>{timerOn?"ACTIVÉ":"DÉSACTIVÉ"}</span>
-                </button>
+            ):(
+              <div style={{display:"flex",flexDirection:"column",gap:20,marginBottom:24}}>
+                <div>
+                  <FL>Nombre de questions</FL>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {EXAM_COUNTS.filter(n=>n<=pool.length).map(n=>(
+                      <button key={n} onClick={()=>setExamCount(n)} style={{flex:1,minWidth:60,background:examCount===n?accentColor:"transparent",color:examCount===n?"#fff":C.muted,border:`1px solid ${examCount===n?accentColor:C.border2}`,borderRadius:4,padding:"9px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:15,transition:"all 0.15s"}}>{n}</button>
+                    ))}
+                    {pool.length>0&&<button onClick={()=>setExamCount(pool.length)} style={{flex:1,minWidth:60,background:examCount===pool.length?accentColor:"transparent",color:examCount===pool.length?"#fff":C.muted,border:`1px solid ${examCount===pool.length?accentColor:C.border2}`,borderRadius:4,padding:"9px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:13,transition:"all 0.15s"}}>Tout ({pool.length})</button>}
+                  </div>
+                </div>
+                <div>
+                  <FL>Chronomètre par question (optionnel)</FL>
+                  <button onClick={()=>setTimerOn(t=>!t)} style={{width:"100%",background:timerOn?"#1a120822":"transparent",color:timerOn?C.yellowL:C.muted,border:`1px solid ${timerOn?C.yellowL:C.border2}`,borderRadius:4,padding:"11px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14,transition:"all 0.15s",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span>⏱ {TIMER_DEFAULT}s par question</span>
+                    <span style={{fontSize:11,background:timerOn?C.yellowL:C.faint,color:timerOn?"#000":C.muted,padding:"2px 10px",borderRadius:20}}>{timerOn?"ACTIVÉ":"DÉSACTIVÉ"}</span>
+                  </button>
+                </div>
               </div>
-              <div style={{display:"flex",gap:10}}>
-                <Btn onClick={startExam} disabled={maxQ===0} full>DÉMARRER →</Btn>
-                <Btn onClick={()=>setPreExam(null)} ghost>Annuler</Btn>
-              </div>
-              {maxQ===0&&<div style={{color:C.orange,fontSize:13,textAlign:"center"}}>⚠ Aucune question disponible pour ce mode.</div>}
+            )}
+
+            <div style={{display:"flex",gap:10}}>
+              <Btn onClick={startExam} disabled={maxQ===0} full color={accentColor}>DÉMARRER →</Btn>
+              <Btn onClick={()=>setPreExam(null)} ghost>Annuler</Btn>
             </div>
+            {maxQ===0&&<div style={{color:C.orange,fontSize:13,textAlign:"center",marginTop:12}}>⚠ Aucune question disponible.</div>}
           </div>
         </div>
       </Wrap>
@@ -649,8 +655,8 @@ export default function App() {
 
   // ── HOME ───────────────────────────────────────────────────
   if(page==="home"){
-    const stats  = computeStats(myResults);
-    const badges = getUnlocked(myResults,cats);
+    const stats=computeStats(myResults);
+    const badges=getUnlocked(myResults,cats);
     return (
       <Wrap>
         <Topbar
@@ -666,15 +672,13 @@ export default function App() {
             <button onClick={doLogout} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",padding:"4px 8px"}} onMouseEnter={e=>e.currentTarget.style.color=C.text2} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>Déco.</button>
           </>}
         />
-
-        {/* Hero */}
         <div style={{background:`linear-gradient(150deg, rgba(232,57,42,0.12) 0%, rgba(6,6,10,0) 45%)`,borderBottom:`1px solid ${C.border}`,padding:"52px 24px 44px"}}>
           <div style={{maxWidth:700,margin:"0 auto",textAlign:"center"}}>
             <h1 style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(24px,5vw,48px)",fontWeight:700,letterSpacing:3,textTransform:"uppercase",margin:"0 0 12px"}}>Bonjour, {pseudo} 👋</h1>
-            <p style={{color:C.text2,fontSize:15,fontWeight:300,maxWidth:420,margin:"0 auto",lineHeight:1.8}}>Testez et renforcez vos connaissances en choisissant une catégorie ci-dessous.</p>
+            <p style={{color:C.text2,fontSize:15,fontWeight:300,maxWidth:420,margin:"0 auto",lineHeight:1.8}}>Testez et renforcez vos connaissances.</p>
             {stats.total>0&&(
               <div style={{display:"inline-flex",alignItems:"center",gap:20,marginTop:24,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 24px"}}>
-                <div style={{textAlign:"center"}}><div style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700,color:C.text}}>{stats.total}</div><div style={{color:C.muted,fontSize:11}}>examens</div></div>
+                <div style={{textAlign:"center"}}><div style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700}}>{stats.total}</div><div style={{color:C.muted,fontSize:11}}>examens</div></div>
                 <div style={{width:1,height:30,background:C.border}}/>
                 <div style={{textAlign:"center"}}><div style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700,color:pct2col(stats.avg)}}>{stats.avg}%</div><div style={{color:C.muted,fontSize:11}}>moyenne</div></div>
                 <div style={{width:1,height:30,background:C.border}}/>
@@ -687,14 +691,20 @@ export default function App() {
         <div style={{maxWidth:960,margin:"0 auto",padding:"40px 24px"}}>
           {/* Modes spéciaux */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,marginBottom:36}}>
-            <div onClick={()=>openPreExam(null,"all")} style={{background:`linear-gradient(135deg, rgba(124,58,237,0.15), rgba(168,85,247,0.08))`,border:`1px solid ${C.purpleL}44`,borderRadius:6,padding:"18px 20px",cursor:"pointer",transition:"all 0.2s",display:"flex",alignItems:"center",gap:14}} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.purpleL;e.currentTarget.style.transform="translateY(-2px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.purpleL+"44";e.currentTarget.style.transform="none";}}>
-              <span style={{fontSize:28}}>🌐</span>
-              <div><div style={{fontFamily:"Oswald,sans-serif",fontSize:15,letterSpacing:1,color:C.purpleL}}>TOUTES CATÉGORIES</div><div style={{color:C.muted,fontSize:12,marginTop:2}}>Questions mélangées</div></div>
+            <div onClick={()=>openPreExam(null,"all")} style={{background:`linear-gradient(135deg, rgba(232,57,42,0.15), rgba(232,57,42,0.05))`,border:`1px solid ${C.red}44`,borderRadius:6,padding:"18px 20px",cursor:"pointer",transition:"all 0.2s",display:"flex",alignItems:"center",gap:14}} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.red;e.currentTarget.style.transform="translateY(-2px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.red+"44";e.currentTarget.style.transform="none";}}>
+              <span style={{fontSize:28}}>📋</span>
+              <div>
+                <div style={{fontFamily:"Oswald,sans-serif",fontSize:15,letterSpacing:1,color:C.red}}>EXAMEN BLANC</div>
+                <div style={{color:C.muted,fontSize:12,marginTop:2}}>40 questions · 60 min</div>
+              </div>
             </div>
             {wrongIds.size>0&&(
               <div onClick={()=>openPreExam(null,"revision")} style={{background:`linear-gradient(135deg, rgba(240,115,32,0.15), rgba(240,115,32,0.05))`,border:`1px solid ${C.orange}44`,borderRadius:6,padding:"18px 20px",cursor:"pointer",transition:"all 0.2s",display:"flex",alignItems:"center",gap:14}} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.orange;e.currentTarget.style.transform="translateY(-2px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.orange+"44";e.currentTarget.style.transform="none";}}>
                 <span style={{fontSize:28}}>🔄</span>
-                <div><div style={{fontFamily:"Oswald,sans-serif",fontSize:15,letterSpacing:1,color:C.orange}}>MES ERREURS</div><div style={{color:C.muted,fontSize:12,marginTop:2}}>{wrongIds.size} question{wrongIds.size>1?"s":""} à revoir</div></div>
+                <div>
+                  <div style={{fontFamily:"Oswald,sans-serif",fontSize:15,letterSpacing:1,color:C.orange}}>MES ERREURS</div>
+                  <div style={{color:C.muted,fontSize:12,marginTop:2}}>{wrongIds.size} question{wrongIds.size>1?"s":""} à revoir</div>
+                </div>
               </div>
             )}
           </div>
@@ -704,7 +714,6 @@ export default function App() {
             <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Catégories</span>
             <span style={{color:C.muted,fontSize:12}}>{cats.length} disponible{cats.length!==1?"s":""}</span>
           </div>
-
           {cats.length===0?(
             <div style={{textAlign:"center",color:C.muted,padding:"80px 0"}}><div style={{fontSize:44,marginBottom:14}}>📋</div>{isAdmin?"Aucune catégorie — créez-en une dans l'admin.":"Aucune catégorie disponible."}</div>
           ):(
@@ -720,7 +729,7 @@ export default function App() {
                     style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${cat.color}`,borderRadius:6,padding:"20px",cursor:ok?"pointer":"default",opacity:ok?1:0.45,transition:"all 0.2s"}}
                     onMouseEnter={e=>{if(ok){e.currentTarget.style.background=C.card2;e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`0 8px 24px rgba(0,0,0,0.4), 0 0 0 1px ${cat.color}44`;}}}
                     onMouseLeave={e=>{e.currentTarget.style.background=C.card;e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
-                    <div style={{fontFamily:"Oswald,sans-serif",fontSize:17,fontWeight:600,marginBottom:6,letterSpacing:0.5}}>{cat.name}</div>
+                    <div style={{fontFamily:"Oswald,sans-serif",fontSize:17,fontWeight:600,marginBottom:6}}>{cat.name}</div>
                     <div style={{color:C.text2,fontSize:13,fontWeight:300,marginBottom:16,lineHeight:1.6,minHeight:36}}>{cat.desc}</div>
                     {avg2!==null&&<div style={{background:C.bg,borderRadius:4,height:4,marginBottom:12,overflow:"hidden"}}><div style={{height:"100%",width:`${avg2}%`,background:pct2col(avg2),borderRadius:4,transition:"width 0.6s"}}/></div>}
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -738,10 +747,10 @@ export default function App() {
             <div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
                 <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Mes badges</span>
-                <span style={{color:C.muted,fontSize:12}}>{badges.length}/{BADGES.length} débloqués</span>
+                <span style={{color:C.muted,fontSize:12}}>{getUnlocked(myResults,cats).length}/{BADGES.length} débloqués</span>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
-                {BADGES.map(b=><BadgeCard key={b.id} badge={b} unlocked={badges.some(u=>u.id===b.id)}/>)}
+                {BADGES.map(b=><BadgeCard key={b.id} badge={b} unlocked={getUnlocked(myResults,cats).some(u=>u.id===b.id)}/>)}
               </div>
             </div>
           )}
@@ -752,21 +761,19 @@ export default function App() {
 
   // ── RESOURCES ──────────────────────────────────────────────
   if(page==="resources"){
-    const filtered = resCat==="all" ? docs : docs.filter(d=>d.catId===resCat);
+    const filtered=resCat==="all"?docs:docs.filter(d=>d.catId===resCat);
     return (
       <Wrap>
         <Topbar title="📚 Ressources documentaires" back={()=>setPage("home")} right={<span style={{color:C.muted,fontSize:13}}>👤 {pseudo}</span>}/>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"12px 24px",display:"flex",gap:8,flexWrap:"wrap"}}>
           <button onClick={()=>setResCat("all")} style={{background:resCat==="all"?C.text:"transparent",color:resCat==="all"?C.bg:C.muted,border:`1px solid ${resCat==="all"?C.text:C.border2}`,borderRadius:20,padding:"5px 16px",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif",fontWeight:700,transition:"all 0.15s"}}>Toutes</button>
           {cats.map(cat=>(
-            <button key={cat.id} onClick={()=>setResCat(cat.id)} style={{background:resCat===cat.id?cat.color:"transparent",color:resCat===cat.id?"#fff":C.muted,border:`1px solid ${resCat===cat.id?cat.color:C.border2}`,borderRadius:20,padding:"5px 16px",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif",fontWeight:600,transition:"all 0.15s"}}>
-              {cat.name}
-            </button>
+            <button key={cat.id} onClick={()=>setResCat(cat.id)} style={{background:resCat===cat.id?cat.color:"transparent",color:resCat===cat.id?"#fff":C.muted,border:`1px solid ${resCat===cat.id?cat.color:C.border2}`,borderRadius:20,padding:"5px 16px",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif",fontWeight:600,transition:"all 0.15s"}}>{cat.name}</button>
           ))}
         </div>
         <div style={{maxWidth:960,margin:"0 auto",padding:"40px 24px"}}>
           {filtered.length===0?(
-            <div style={{textAlign:"center",color:C.muted,padding:"80px 0"}}><div style={{fontSize:44,marginBottom:14}}>📂</div><div>{isAdmin?"Ajoutez des documents depuis le panneau admin.":"Aucun document disponible."}</div></div>
+            <div style={{textAlign:"center",color:C.muted,padding:"80px 0"}}><div style={{fontSize:44,marginBottom:14}}>📂</div>{isAdmin?"Ajoutez des documents depuis l'admin.":"Aucun document disponible."}</div>
           ):(
             DOC_TYPES.map(type=>{
               const typeDocs=filtered.filter(d=>d.type===type.key);
@@ -811,23 +818,20 @@ export default function App() {
 
   // ── HISTORY ────────────────────────────────────────────────
   if(page==="history"){
-    const stats  = computeStats(myResults);
-    const badges = getUnlocked(myResults,cats);
+    const stats=computeStats(myResults);
+    const badges=getUnlocked(myResults,cats);
     return (
       <Wrap>
         <Topbar title="📊 Mon bilan" back={()=>setPage("home")} right={<span style={{color:C.muted,fontSize:13}}>👤 {pseudo}</span>}/>
         <div style={{maxWidth:820,margin:"0 auto",padding:"40px 24px"}}>
-          {/* Stats globales */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:12}}>
-            <StatCard label="Examens complétés"  value={stats.total}   color={C.blueL}/>
+            <StatCard label="Examens complétés"  value={stats.total}      color={C.blueL}/>
             <StatCard label="Score moyen général" value={`${stats.avg}%`} color={pct2col(stats.avg)}/>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:32}}>
-            <StatCard label="Bonnes réponses totales" value={stats.correct} color={C.greenL}/>
+            <StatCard label="Bonnes réponses totales" value={stats.correct}                   color={C.greenL}/>
             <StatCard label="Badges débloqués"        value={`${badges.length}/${BADGES.length}`} color={C.yellowL}/>
           </div>
-
-          {/* Progress par catégorie */}
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:16}}>Progression par catégorie</div>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:32}}>
             {cats.map(cat=>{
@@ -848,14 +852,10 @@ export default function App() {
               );
             })}
           </div>
-
-          {/* Badges */}
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:16}}>Badges</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:32}}>
             {BADGES.map(b=><BadgeCard key={b.id} badge={b} unlocked={badges.some(u=>u.id===b.id)}/>)}
           </div>
-
-          {/* Historique */}
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:16}}>Historique détaillé</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {myResults.map(r=>(
@@ -880,33 +880,83 @@ export default function App() {
   if(page==="exam"){
     const q=examList[examIdx];
     const isCorrect=picked===q.correct;
-    const timerPct = timerOn ? (timeLeft/TIMER_DEFAULT)*100 : 100;
+
+    // Stats en temps réel
+    const doneCount   = log.length;
+    const correctCount = log.filter(x=>x.correct).length;
+    const livePct     = doneCount>0 ? Math.round((correctCount/doneCount)*100) : null;
+    const progressPct = ((examIdx)/examList.length)*100;
+
+    // Timer par question
+    const timerPct = timerOn&&examMode!=="all" ? (timeLeft/TIMER_DEFAULT)*100 : 100;
     const timerCol = timeLeft>15?C.greenL:timeLeft>5?C.orange:C.red;
+
+    // Timer global (Examen Blanc)
+    const globalPct = examMode==="all" ? (globalTime/EXAMEN_BLANC_TIMER)*100 : 100;
+    const globalCol = globalTime>600?C.greenL:globalTime>120?C.orange:C.red;
+
     return (
       <Wrap>
-        {/* Barre de progression */}
-        <div style={{height:3,background:C.border}}>
-          <div style={{height:"100%",background:C.red,width:`${((examIdx)/examList.length)*100}%`,transition:"width 0.4s ease"}}/>
+        {/* Barre progression questions */}
+        <div style={{height:4,background:C.border}}>
+          <div style={{height:"100%",background:C.red,width:`${progressPct}%`,transition:"width 0.4s ease"}}/>
         </div>
-        {/* Timer */}
-        {timerOn&&<div style={{height:3,background:C.border}}>
-          <div style={{height:"100%",background:timerCol,width:`${timerPct}%`,transition:"width 1s linear"}}/>
-        </div>}
+        {/* Barre timer par question */}
+        {timerOn&&examMode!=="all"&&(
+          <div style={{height:3,background:C.border}}>
+            <div style={{height:"100%",background:timerCol,width:`${timerPct}%`,transition:"width 1s linear"}}/>
+          </div>
+        )}
 
-        <div style={{maxWidth:680,margin:"0 auto",padding:"40px 24px"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:44}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:examCat?.color||C.purple}}/>
-              <span style={{color:C.text2,fontSize:13}}>
-                {examMode==="all"?"Toutes catégories":examMode==="revision"?"Mode révision":examCat?.name}
-              </span>
+        {/* Header exam */}
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{width:8,height:8,borderRadius:"50%",background:examMode==="all"?C.red:examMode==="revision"?C.orange:examCat?.color||C.purple}}/>
+            <span style={{color:C.text2,fontSize:13,fontFamily:"Oswald,sans-serif",letterSpacing:1}}>
+              {examMode==="all"?"EXAMEN BLANC":examMode==="revision"?"MODE RÉVISION":examCat?.name?.toUpperCase()}
+            </span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            {/* Timer par question */}
+            {timerOn&&examMode!=="all"&&<span style={{fontFamily:"Oswald,sans-serif",fontSize:16,color:timerCol,fontWeight:700,minWidth:28,textAlign:"center"}}>{timeLeft}s</span>}
+            {/* Timer global Examen Blanc */}
+            {examMode==="all"&&(
+              <div style={{display:"flex",alignItems:"center",gap:8,background:C.card,border:`1px solid ${globalCol}44`,borderRadius:4,padding:"5px 12px"}}>
+                <span style={{fontSize:14}}>⏱</span>
+                <span style={{fontFamily:"Oswald,sans-serif",fontSize:15,color:globalCol,fontWeight:700}}>{fmtTimer(globalTime)}</span>
+              </div>
+            )}
+            <span style={{fontFamily:"Oswald,sans-serif",color:C.muted,fontSize:14,letterSpacing:1}}>{examIdx+1} / {examList.length}</span>
+          </div>
+        </div>
+
+        {/* ── BARRE DE PROGRESSION EN TEMPS RÉEL ── */}
+        {doneCount>0&&(
+          <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"10px 24px",display:"flex",alignItems:"center",gap:16}}>
+            {/* Barre visuelle */}
+            <div style={{flex:1,background:C.bg,borderRadius:99,height:8,overflow:"hidden",position:"relative"}}>
+              {/* Bonnes réponses (vert) */}
+              <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${(correctCount/examList.length)*100}%`,background:C.greenL,borderRadius:99,transition:"width 0.4s"}}/>
+              {/* Mauvaises réponses (rouge) */}
+              <div style={{position:"absolute",left:`${(correctCount/examList.length)*100}%`,top:0,height:"100%",width:`${((doneCount-correctCount)/examList.length)*100}%`,background:C.red,borderRadius:99,transition:"width 0.4s"}}/>
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:14}}>
-              {timerOn&&<span style={{fontFamily:"Oswald,sans-serif",fontSize:16,color:timerCol,fontWeight:700,minWidth:28,textAlign:"center"}}>{timeLeft}</span>}
-              <span style={{fontFamily:"Oswald,sans-serif",color:C.muted,fontSize:14,letterSpacing:1}}>{examIdx+1} / {examList.length}</span>
+            {/* Stats texte */}
+            <div style={{display:"flex",alignItems:"center",gap:14,flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:C.greenL}}/>
+                <span style={{fontFamily:"Oswald,sans-serif",fontSize:14,fontWeight:700,color:C.greenL}}>{correctCount}</span>
+                <span style={{color:C.muted,fontSize:12}}>/ {doneCount}</span>
+              </div>
+              {livePct!==null&&(
+                <div style={{background:pct2col(livePct)+"18",border:`1px solid ${pct2col(livePct)}44`,borderRadius:4,padding:"3px 10px"}}>
+                  <span style={{fontFamily:"Oswald,sans-serif",fontSize:14,fontWeight:700,color:pct2col(livePct)}}>{livePct}%</span>
+                </div>
+              )}
             </div>
           </div>
+        )}
 
+        <div style={{maxWidth:680,margin:"0 auto",padding:"36px 24px"}}>
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(18px,3vw,24px)",fontWeight:500,lineHeight:1.55,marginBottom:32}}>{q.text}</div>
 
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
@@ -937,8 +987,8 @@ export default function App() {
           )}
 
           {!shown
-            ? <Btn onClick={()=>doValidate()} disabled={picked===null} full>{picked===null?"Choisissez une réponse":"VALIDER MA RÉPONSE"}</Btn>
-            : <Btn onClick={nextQ} full>{examIdx+1>=examList.length?"VOIR LES RÉSULTATS →":"QUESTION SUIVANTE →"}</Btn>
+            ?<Btn onClick={()=>doValidate()} disabled={picked===null} full>{picked===null?"Choisissez une réponse":"VALIDER MA RÉPONSE"}</Btn>
+            :<Btn onClick={nextQ} full>{examIdx+1>=examList.length?"VOIR LES RÉSULTATS →":"QUESTION SUIVANTE →"}</Btn>
           }
         </div>
       </Wrap>
@@ -965,9 +1015,8 @@ export default function App() {
             <div style={{height:"100%",width:`${pct}%`,background:pct2col(pct),borderRadius:99,transition:"width 1s ease"}}/>
           </div>
 
-          {/* Nouveaux badges */}
           {newBadges.length>0&&(
-            <div style={{background:C.card,border:`1px solid ${C.yellowL}44`,borderRadius:8,padding:"20px",marginBottom:28,textAlign:"center"}}>
+            <div style={{background:C.card,border:`1px solid ${C.yellowL}44`,borderRadius:8,padding:"20px",marginBottom:28}}>
               <div style={{fontFamily:"Oswald,sans-serif",color:C.yellowL,fontSize:13,letterSpacing:2,marginBottom:14}}>🏅 NOUVEAU{newBadges.length>1?"X":""} BADGE{newBadges.length>1?"S":""} DÉBLOQUÉ{newBadges.length>1?"S":""} !</div>
               <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
                 {newBadges.map(b=>(
@@ -980,7 +1029,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Récap question par question */}
           <div style={{textAlign:"left",marginBottom:32}}>
             {examList.map((q,i)=>{
               const ok=log[i]?.correct;
@@ -999,7 +1047,7 @@ export default function App() {
           </div>
 
           <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-            {examCat&&<Btn onClick={()=>openPreExam(examCat,examMode)}>🔄 Recommencer</Btn>}
+            {examMode==="all"?<Btn onClick={()=>openPreExam(null,"all")}>🔄 Nouvel examen blanc</Btn>:examCat?<Btn onClick={()=>openPreExam(examCat,examMode)}>🔄 Recommencer</Btn>:null}
             <Btn onClick={()=>setPage("history")} ghost>📊 Mon bilan</Btn>
             <Btn onClick={()=>setPage("home")} ghost>← Accueil</Btn>
           </div>
@@ -1010,13 +1058,10 @@ export default function App() {
 
   // ── ADMIN ──────────────────────────────────────────────────
   if(page==="admin"){
-    const enterTab = async tab=>{
-      setAdminTab(tab);setEditQ(null);setEditCat(null);setEditDoc(null);setSaveErr("");
-      if(tab==="classement") await loadAllResults();
-    };
-    const filteredResults = classFilter==="all"?allResults:allResults.filter(r=>r.cat_id===classFilter);
-    const pseudos = [...new Set(filteredResults.map(r=>r.pseudo))];
-    const leaderboard = pseudos.map(p=>{
+    const enterTab=async tab=>{setAdminTab(tab);setEditQ(null);setEditCat(null);setEditDoc(null);setSaveErr("");if(tab==="classement")await loadAllResults();};
+    const filteredResults=classFilter==="all"?allResults:allResults.filter(r=>r.cat_id===classFilter);
+    const pseudos=[...new Set(filteredResults.map(r=>r.pseudo))];
+    const leaderboard=pseudos.map(p=>{
       const pr=filteredResults.filter(r=>r.pseudo===p);
       return {pseudo:p,count:pr.length,avg:Math.round(pr.reduce((a,r)=>a+r.pct,0)/pr.length),best:Math.max(...pr.map(r=>r.pct)),last:pr[0]?.created_at};
     }).sort((a,b)=>b.avg-a.avg);
@@ -1027,27 +1072,24 @@ export default function App() {
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:16}}>🔥</span>
             <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:3,textTransform:"uppercase"}}>Administration</span>
-            <span style={{background:C.red,color:"#fff",fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,letterSpacing:0.5}}>ADMIN</span>
+            <span style={{background:C.red,color:"#fff",fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20}}>ADMIN</span>
           </div>
           <button onClick={()=>setPage("home")} style={{background:"transparent",color:C.muted,border:"none",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif"}} onMouseEnter={e=>e.currentTarget.style.color=C.text2} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>← Retour au site</button>
         </div>
-
         <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",padding:"0 20px",overflowX:"auto"}}>
           {[["qs","📋 Questions"],["cats","🗂 Catégories"],["documents","📚 Documents"],["classement","🏆 Classement"],["settings","⚙ Paramètres"]].map(([k,l])=>(
             <button key={k} onClick={()=>enterTab(k)} style={{background:"none",border:"none",borderBottom:`2px solid ${adminTab===k?C.red:"transparent"}`,color:adminTab===k?C.text:C.muted,padding:"14px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14,whiteSpace:"nowrap",transition:"all 0.15s"}}>{l}</button>
           ))}
         </div>
-
         <div style={{maxWidth:960,margin:"0 auto",padding:"32px 24px"}}>
 
-          {/* ── QUESTIONS ── */}
           {adminTab==="qs"&&!editQ&&(<>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Questions</h2><span style={{background:C.faint,color:C.muted,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20}}>{qs.length}</span></div>
               <Btn onClick={()=>{setSaveErr("");setEditQ({catId:cats[0]?.id||"",text:"",opts:["","","",""],correct:0,expl:""});}} disabled={cats.length===0} sm>+ Ajouter</Btn>
             </div>
             {cats.length===0&&<div style={{color:C.orange,fontSize:13,background:"#1a120822",border:`1px solid ${C.orange}44`,borderRadius:4,padding:"10px 14px",marginBottom:14}}>⚠ Créez d'abord une catégorie.</div>}
-            {qs.length===0?<div style={{textAlign:"center",color:C.muted,padding:"60px 0"}}>Aucune question. Commencez par en ajouter une.</div>:(
+            {qs.length===0?<div style={{textAlign:"center",color:C.muted,padding:"60px 0"}}>Aucune question.</div>:(
               <div style={{display:"flex",flexDirection:"column",gap:6}}>
                 {qs.map(q=>{
                   const cat=cats.find(c=>c.id===q.catId);
@@ -1059,7 +1101,7 @@ export default function App() {
                       </div>
                       <div style={{display:"flex",gap:8,flexShrink:0}}>
                         <button onClick={()=>{setSaveErr("");setEditQ({...q});}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.text2,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Éditer</button>
-                        <button onClick={()=>setDelConfirm({type:"q",id:q.id})} style={{background:"#1e080822",border:`1px solid #4a181844`,color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
+                        <button onClick={()=>setDelConfirm({type:"q",id:q.id})} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
                       </div>
                     </div>
                   );
@@ -1069,7 +1111,6 @@ export default function App() {
           </>)}
           {adminTab==="qs"&&editQ&&<QForm initial={editQ} cats={cats} qs={qs} onSave={saveQ} onCancel={()=>setEditQ(null)} saving={saving} saveErr={saveErr}/>}
 
-          {/* ── CATEGORIES ── */}
           {adminTab==="cats"&&!editCat&&(<>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Catégories</h2><span style={{background:C.faint,color:C.muted,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20}}>{cats.length}</span></div>
@@ -1084,7 +1125,7 @@ export default function App() {
                       <div><div style={{fontWeight:700,fontSize:14,marginBottom:3}}>{cat.name}</div><div style={{fontSize:12,color:C.muted}}>{cat.desc} · {count} question{count!==1?"s":""}</div></div>
                       <div style={{display:"flex",gap:8}}>
                         <button onClick={()=>{setSaveErr("");setEditCat({...cat});}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.text2,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Éditer</button>
-                        <button onClick={()=>setDelConfirm({type:"cat",id:cat.id})} style={{background:"#1e080822",border:`1px solid #4a181844`,color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
+                        <button onClick={()=>setDelConfirm({type:"cat",id:cat.id})} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
                       </div>
                     </div>
                   );
@@ -1094,7 +1135,6 @@ export default function App() {
           </>)}
           {adminTab==="cats"&&editCat&&<CatForm initial={editCat} cats={cats} onSave={saveCat} onCancel={()=>setEditCat(null)} saving={saving} saveErr={saveErr}/>}
 
-          {/* ── DOCUMENTS ── */}
           {adminTab==="documents"&&!editDoc&&(<>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Documents</h2><span style={{background:C.faint,color:C.muted,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20}}>{docs.length}</span></div>
@@ -1108,15 +1148,12 @@ export default function App() {
                   return (
                     <div key={doc.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16}}>
                       <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:"flex",gap:8,marginBottom:4}}>
-                          <span style={{fontSize:11,color:dtype?.color,fontWeight:600}}>{dtype?.icon} {dtype?.label}</span>
-                          {cat&&<span style={{fontSize:11,color:cat.color,fontWeight:600}}>· {cat.name}</span>}
-                        </div>
+                        <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{fontSize:11,color:dtype?.color,fontWeight:600}}>{dtype?.icon} {dtype?.label}</span>{cat&&<span style={{fontSize:11,color:cat.color,fontWeight:600}}>· {cat.name}</span>}</div>
                         <div style={{fontSize:14,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.title}</div>
                       </div>
                       <div style={{display:"flex",gap:8,flexShrink:0}}>
                         <button onClick={()=>{setSaveErr("");setEditDoc({...doc});}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.text2,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Éditer</button>
-                        <button onClick={()=>setDelConfirm({type:"doc",id:doc.id})} style={{background:"#1e080822",border:`1px solid #4a181844`,color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
+                        <button onClick={()=>setDelConfirm({type:"doc",id:doc.id})} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
                       </div>
                     </div>
                   );
@@ -1126,7 +1163,6 @@ export default function App() {
           </>)}
           {adminTab==="documents"&&editDoc&&<DocForm initial={editDoc} cats={cats} docs={docs} onSave={saveDoc} onCancel={()=>setEditDoc(null)} saving={saving} saveErr={saveErr}/>}
 
-          {/* ── CLASSEMENT ── */}
           {adminTab==="classement"&&(
             <div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:10}}>
@@ -1189,7 +1225,6 @@ export default function App() {
             </div>
           )}
 
-          {/* ── SETTINGS ── */}
           {adminTab==="settings"&&(
             <div style={{maxWidth:480}}>
               <h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",marginBottom:28}}>Paramètres du compte</h2>
@@ -1210,7 +1245,7 @@ export default function App() {
                 {pwOk&&<OkBox msg="✓ Mot de passe mis à jour !"/>}
                 <div style={{marginTop:12}}><Btn onClick={savePw} disabled={!newPw||!newPw2} color={C.red} sm>Mettre à jour</Btn></div>
               </div>
-              <div style={{background:"#141208",border:`1px solid #303010`,borderRadius:6,padding:"14px 18px"}}>
+              <div style={{background:"#141208",border:"1px solid #303010",borderRadius:6,padding:"14px 18px"}}>
                 <div style={{color:C.yellowL,fontSize:13,fontWeight:700,marginBottom:6}}>Informations du compte</div>
                 <div style={{color:C.muted,fontSize:13}}>Email : <strong style={{color:C.text}}>{user?.email}</strong></div>
                 <div style={{color:C.muted,fontSize:13,marginTop:4}}>Statut : <strong style={{color:C.greenL}}>Administrateur ✓</strong></div>
@@ -1219,13 +1254,12 @@ export default function App() {
           )}
         </div>
 
-        {/* Modal suppression */}
         {delConfirm&&(
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:24,backdropFilter:"blur(4px)"}}>
             <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:32,maxWidth:380,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.6)"}}>
               <div style={{fontFamily:"Oswald,sans-serif",fontSize:18,marginBottom:10}}>Confirmer la suppression</div>
               <p style={{color:C.text2,fontSize:14,marginBottom:28,lineHeight:1.6}}>
-                {delConfirm.type==="cat"?"⚠ Supprimer cette catégorie supprimera aussi toutes ses questions et documents associés.":delConfirm.type==="doc"?"Ce document sera définitivement supprimé.":"Cette action est irréversible."}
+                {delConfirm.type==="cat"?"⚠ Supprimer cette catégorie supprimera aussi toutes ses questions et documents.":delConfirm.type==="doc"?"Ce document sera définitivement supprimé.":"Cette action est irréversible."}
               </p>
               <div style={{display:"flex",gap:10}}>
                 <Btn onClick={()=>{if(delConfirm.type==="q")deleteQ(delConfirm.id);else if(delConfirm.type==="doc")deleteDoc(delConfirm.id);else deleteCat(delConfirm.id);}} full danger>Supprimer définitivement</Btn>
