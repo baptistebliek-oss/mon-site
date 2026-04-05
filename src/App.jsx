@@ -841,20 +841,100 @@ export default function App() {
             <StatCard label="Badges débloqués"        value={`${badges.length}/${BADGES.length}`} color={C.yellowL}/>
           </div>
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:16}}>Progression par catégorie</div>
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:32}}>
+          <div style={{display:"flex",flexDirection:"column",gap:14,marginBottom:32}}>
             {cats.map(cat=>{
-              const r2=myResults.filter(r=>r.cat_id===cat.id);
-              if(!r2.length) return <div key={cat.id} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${cat.color}44`,borderRadius:4,padding:"12px 16px",opacity:0.5}}><div style={{fontSize:13,color:C.muted}}>{cat.name} — aucun examen</div></div>;
-              const ca=Math.round(r2.reduce((a,r)=>a+r.pct,0)/r2.length);
+              const r2=[...myResults.filter(r=>r.cat_id===cat.id)].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+              if(!r2.length) return (
+                <div key={cat.id} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${cat.color}44`,borderRadius:4,padding:"12px 18px",opacity:0.45}}>
+                  <span style={{fontSize:13,color:C.muted}}>{cat.name} — aucun examen</span>
+                </div>
+              );
+              const avg2=Math.round(r2.reduce((a,r)=>a+r.pct,0)/r2.length);
+              const n=r2.length;
+              const W=560,H=130,pL=38,pR=16,pT=18,pB=28;
+              const pW=W-pL-pR, pH=H-pT-pB;
+              const xOf=i=>pL+(n<=1?pW/2:(i/(n-1))*pW);
+              const yOf=v=>pT+pH-(v/100)*pH;
+              const pathD=r2.map((r,i)=>`${i===0?"M":"L"}${xOf(i).toFixed(1)},${yOf(r.pct).toFixed(1)}`).join(" ");
+              const areaD=`${pathD} L${xOf(n-1).toFixed(1)},${(pT+pH).toFixed(1)} L${xOf(0).toFixed(1)},${(pT+pH).toFixed(1)} Z`;
+              const best=Math.max(...r2.map(r=>r.pct));
+              const worst=Math.min(...r2.map(r=>r.pct));
+              const trend=n>=2?r2[n-1].pct-r2[0].pct:0;
               return (
-                <div key={cat.id} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${cat.color}`,borderRadius:4,padding:"14px 18px",display:"flex",alignItems:"center",gap:16}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>{cat.name}</div>
-                    <div style={{background:C.bg,borderRadius:99,height:5,overflow:"hidden"}}><div style={{height:"100%",width:`${ca}%`,background:pct2col(ca),borderRadius:99,transition:"width 0.6s"}}/></div>
+                <div key={cat.id} style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${cat.color}`,borderRadius:6,padding:"16px 20px"}}>
+                  {/* En-tête */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                    <div style={{fontFamily:"Oswald,sans-serif",fontSize:15,fontWeight:600}}>{cat.name}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:12}}>
+                      {n>=2&&(
+                        <span style={{fontSize:12,color:trend>0?C.greenL:trend<0?C.red:C.muted,fontWeight:700,display:"flex",alignItems:"center",gap:3}}>
+                          {trend>0?"↑":trend<0?"↓":"→"} {Math.abs(trend)}pts
+                        </span>
+                      )}
+                      <ScorePill pct={avg2}/>
+                      <span style={{color:C.muted,fontSize:11}}>{n} tentative{n>1?"s":""}</span>
+                    </div>
                   </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
-                    <ScorePill pct={ca}/>
-                    <div style={{color:C.muted,fontSize:11,marginTop:4}}>{r2.length} tentative{r2.length>1?"s":""}</div>
+
+                  {/* Graphique SVG */}
+                  <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block",overflow:"visible"}}>
+                    {/* Zone de fond */}
+                    <rect x={pL} y={pT} width={pW} height={pH} fill={C.bg} rx={2}/>
+
+                    {/* Lignes de grille horizontales */}
+                    {[0,25,50,75,100].map(v=>(
+                      <g key={v}>
+                        <line x1={pL} y1={yOf(v)} x2={pL+pW} y2={yOf(v)} stroke={v===0||v===100?C.border2:C.border} strokeWidth={v===50?1.5:1} strokeDasharray={v===0||v===100?"none":"4,4"}/>
+                        <text x={pL-6} y={yOf(v)+3.5} fontSize={9} fill={C.muted} textAnchor="end" fontFamily="Barlow,sans-serif">{v}%</text>
+                      </g>
+                    ))}
+
+                    {/* Ligne seuil 70% */}
+                    <line x1={pL} y1={yOf(70)} x2={pL+pW} y2={yOf(70)} stroke={C.greenL} strokeWidth={1} strokeDasharray="6,3" strokeOpacity={0.5}/>
+                    <text x={pL+pW+4} y={yOf(70)+3.5} fontSize={8} fill={C.greenL} fillOpacity={0.7} fontFamily="Barlow,sans-serif">70%</text>
+
+                    {/* Aire sous la courbe */}
+                    <defs>
+                      <linearGradient id={`grad-${cat.id}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={cat.color} stopOpacity="0.25"/>
+                        <stop offset="100%" stopColor={cat.color} stopOpacity="0.02"/>
+                      </linearGradient>
+                    </defs>
+                    <path d={areaD} fill={`url(#grad-${cat.id})`}/>
+
+                    {/* Courbe principale */}
+                    <path d={pathD} fill="none" stroke={cat.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round"/>
+
+                    {/* Points */}
+                    {r2.map((r,i)=>{
+                      const cx=xOf(i), cy=yOf(r.pct);
+                      const col=pct2col(r.pct);
+                      const showLabel=n<=12;
+                      return (
+                        <g key={i}>
+                          {/* Halo */}
+                          <circle cx={cx} cy={cy} r={7} fill={col} fillOpacity={0.15}/>
+                          {/* Point */}
+                          <circle cx={cx} cy={cy} r={4} fill={col} stroke={C.card} strokeWidth={2}/>
+                          {/* Label score */}
+                          {showLabel&&(
+                            <text x={cx} y={cy-11} fontSize={9} fill={col} textAnchor="middle" fontFamily="Oswald,sans-serif" fontWeight="700">{r.pct}%</text>
+                          )}
+                        </g>
+                      );
+                    })}
+
+                    {/* Labels X (numéros tentatives) */}
+                    {r2.map((r,i)=>(
+                      n<=10&&<text key={i} x={xOf(i)} y={H-4} fontSize={8.5} fill={C.muted} textAnchor="middle" fontFamily="Barlow,sans-serif">#{i+1}</text>
+                    ))}
+                  </svg>
+
+                  {/* Mini stats sous le graphique */}
+                  <div style={{display:"flex",gap:16,marginTop:10,paddingTop:10,borderTop:`1px solid ${C.border}`}}>
+                    <div style={{fontSize:12,color:C.muted}}>Meilleur : <strong style={{color:C.greenL}}>{best}%</strong></div>
+                    <div style={{fontSize:12,color:C.muted}}>Plus bas : <strong style={{color:worst>=70?C.greenL:worst>=50?C.orange:C.red}}>{worst}%</strong></div>
+                    {n>=2&&<div style={{fontSize:12,color:C.muted}}>Tendance : <strong style={{color:trend>0?C.greenL:trend<0?C.red:C.muted}}>{trend>0?"+":""}{trend}pts</strong></div>}
                   </div>
                 </div>
               );
@@ -976,8 +1056,8 @@ export default function App() {
                 else if(i===picked&&i!==q.correct){bg="#1e0808";brd=`1px solid ${C.red}`;clr=C.text2;}
               }
               return (
-                <div key={i} onClick={()=>!shown&&picked===null&&setPicked(i)}
-                  style={{background:bg,border:brd,borderRadius:6,padding:"14px 18px",cursor:shown?"default":picked===null?"pointer":"default",display:"flex",alignItems:"center",gap:14,color:clr,transition:"all 0.15s",boxShadow:shadow2}}>
+                <div key={i} onClick={()=>!shown&&setPicked(i)}
+                  style={{background:bg,border:brd,borderRadius:6,padding:"14px 18px",cursor:shown?"default":"pointer",display:"flex",alignItems:"center",gap:14,color:clr,transition:"all 0.15s",boxShadow:shadow2}}>
                   <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,fontWeight:700,minWidth:24,color:shown&&i===q.correct?C.greenL:shown&&i===picked&&i!==q.correct?C.red:"#404050"}}>{LABELS[i]}</span>
                   <span style={{fontSize:15,flex:1,lineHeight:1.5}}>{opt}</span>
                   {shown&&i===q.correct&&<span style={{color:C.greenL,fontWeight:700,fontSize:16}}>✓</span>}
@@ -995,7 +1075,7 @@ export default function App() {
           )}
 
           {!shown
-            ?<Btn onClick={()=>doValidate()} disabled={picked===null} full>{picked===null?"Choisissez une réponse":"VALIDER MA RÉPONSE"}</Btn>
+            ?<Btn onClick={()=>doValidate()} disabled={picked===null} full>{picked===null?"Choisissez une réponse":"VALIDER MA RÉPONSE ✓"}</Btn>
             :<Btn onClick={nextQ} full>{examIdx+1>=examList.length?"VOIR LES RÉSULTATS →":"QUESTION SUIVANTE →"}</Btn>
           }
         </div>
