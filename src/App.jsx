@@ -259,6 +259,11 @@ export default function App() {
   const [saveErr,setSaveErr]         = useState("");
   const [classFilter,setClassFilter] = useState("all");
 
+  // Recherche admin questions
+  const [qSearch,setQSearch]         = useState("");
+  const [qCatFilter,setQCatFilter]   = useState("all");
+  const [qSort,setQSort]             = useState("date"); // "date" | "cat" | "alpha"
+
   const [resCat,setResCat]       = useState("all");
 
   const [newPseudo,setNewPseudo] = useState(""); const [pseudoOk,setPseudoOk] = useState(false);
@@ -480,7 +485,10 @@ export default function App() {
     else if(mode==="revision") pool=qs.filter(q=>wrongIds.has(q.id));
     if(!pool.length) return;
     const max = mode==="all" ? EXAMEN_BLANC_MAX : examCount;
-    const shuffled=pool.sort(()=>Math.random()-0.5).slice(0,max);
+    const shuffled=pool.sort(()=>Math.random()-0.5).slice(0,max).map(q=>{
+      const indices=[0,1,2,3].sort(()=>Math.random()-0.5);
+      return { ...q, opts:indices.map(i=>q.opts[i]), correct:indices.indexOf(q.correct) };
+    });
     answersRef.current=[];
     setExamCat(cat);setExamMode(mode);setExamList(shuffled);
     setExamIdx(0);setPicked(null);setShown(false);setLog([]);
@@ -1083,32 +1091,128 @@ export default function App() {
         </div>
         <div style={{maxWidth:960,margin:"0 auto",padding:"32px 24px"}}>
 
-          {adminTab==="qs"&&!editQ&&(<>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}><h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Questions</h2><span style={{background:C.faint,color:C.muted,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20}}>{qs.length}</span></div>
-              <Btn onClick={()=>{setSaveErr("");setEditQ({catId:cats[0]?.id||"",text:"",opts:["","","",""],correct:0,expl:""});}} disabled={cats.length===0} sm>+ Ajouter</Btn>
-            </div>
-            {cats.length===0&&<div style={{color:C.orange,fontSize:13,background:"#1a120822",border:`1px solid ${C.orange}44`,borderRadius:4,padding:"10px 14px",marginBottom:14}}>⚠ Créez d'abord une catégorie.</div>}
-            {qs.length===0?<div style={{textAlign:"center",color:C.muted,padding:"60px 0"}}>Aucune question.</div>:(
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {qs.map(q=>{
-                  const cat=cats.find(c=>c.id===q.catId);
-                  return (
-                    <div key={q.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,transition:"border-color 0.15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.border2} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:14,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{q.text}</div>
-                        {cat&&<span style={{fontSize:11,color:cat.color,fontWeight:600,background:cat.color+"18",borderRadius:20,padding:"1px 8px"}}>{cat.name}</span>}
-                      </div>
-                      <div style={{display:"flex",gap:8,flexShrink:0}}>
-                        <button onClick={()=>{setSaveErr("");setEditQ({...q});}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.text2,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Éditer</button>
-                        <button onClick={()=>setDelConfirm({type:"q",id:q.id})} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
-                      </div>
-                    </div>
-                  );
-                })}
+          {adminTab==="qs"&&!editQ&&(()=>{
+            // Filtrage + tri
+            const term = qSearch.toLowerCase().trim();
+            const filtered = qs
+              .filter(q=>{
+                const catOk = qCatFilter==="all" || q.catId===qCatFilter;
+                const textOk = !term || q.text.toLowerCase().includes(term) || q.opts.some(o=>o.toLowerCase().includes(term));
+                return catOk && textOk;
+              })
+              .sort((a,b)=>{
+                if(qSort==="alpha") return a.text.localeCompare(b.text,"fr");
+                if(qSort==="cat"){
+                  const ca=cats.find(c=>c.id===a.catId)?.name||"";
+                  const cb=cats.find(c=>c.id===b.catId)?.name||"";
+                  return ca.localeCompare(cb,"fr");
+                }
+                return 0; // "date" = ordre de la DB
+              });
+            return (<>
+              {/* Header */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Questions</h2>
+                  <span style={{background:C.faint,color:C.muted,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20}}>{filtered.length}/{qs.length}</span>
+                </div>
+                <Btn onClick={()=>{setSaveErr("");setEditQ({catId:cats[0]?.id||"",text:"",opts:["","","",""],correct:0,expl:""});}} disabled={cats.length===0} sm>+ Ajouter</Btn>
               </div>
-            )}
-          </>)}
+
+              {/* Barre de recherche + filtres */}
+              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:6,padding:"16px 18px",marginBottom:18,display:"flex",flexDirection:"column",gap:12}}>
+                {/* Recherche texte */}
+                <div style={{position:"relative"}}>
+                  <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:C.muted,fontSize:15,pointerEvents:"none"}}>🔍</span>
+                  <input
+                    value={qSearch} onChange={e=>setQSearch(e.target.value)}
+                    placeholder="Rechercher dans les questions ou les réponses..."
+                    style={{width:"100%",background:C.surf,border:`1px solid ${C.border2}`,borderRadius:4,color:C.text,padding:"10px 14px 10px 38px",fontSize:14,fontFamily:"'Barlow',sans-serif",outline:"none",boxSizing:"border-box"}}
+                  />
+                  {qSearch&&<button onClick={()=>setQSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,lineHeight:1}}>✕</button>}
+                </div>
+
+                {/* Filtres */}
+                <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+                  {/* Filtre catégorie */}
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",flex:1}}>
+                    <button onClick={()=>setQCatFilter("all")} style={{background:qCatFilter==="all"?C.text:"transparent",color:qCatFilter==="all"?C.bg:C.muted,border:`1px solid ${qCatFilter==="all"?C.text:C.border2}`,borderRadius:20,padding:"4px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700,transition:"all 0.15s"}}>
+                      Toutes catégories
+                    </button>
+                    {cats.map(cat=>(
+                      <button key={cat.id} onClick={()=>setQCatFilter(qCatFilter===cat.id?"all":cat.id)} style={{background:qCatFilter===cat.id?cat.color:"transparent",color:qCatFilter===cat.id?"#fff":C.muted,border:`1px solid ${qCatFilter===cat.id?cat.color:C.border2}`,borderRadius:20,padding:"4px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600,transition:"all 0.15s"}}>
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Tri */}
+                  <div style={{display:"flex",background:C.surf,borderRadius:4,border:`1px solid ${C.border2}`,overflow:"hidden",flexShrink:0}}>
+                    {[["date","📅 Date"],["alpha","🔤 A→Z"],["cat","🗂 Catégorie"]].map(([k,l])=>(
+                      <button key={k} onClick={()=>setQSort(k)} style={{background:qSort===k?C.border2:"transparent",color:qSort===k?C.text:C.muted,border:"none",borderRight:`1px solid ${C.border}`,padding:"5px 12px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:700,transition:"all 0.15s",whiteSpace:"nowrap"}}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Résumé filtre */}
+                {(term||qCatFilter!=="all")&&(
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{color:C.muted,fontSize:12}}>
+                      {filtered.length} résultat{filtered.length!==1?"s":""} trouvé{filtered.length!==1?"s":""}
+                      {term&&<span> pour <strong style={{color:C.text}}>"{qSearch}"</strong></span>}
+                      {qCatFilter!=="all"&&<span> dans <strong style={{color:cats.find(c=>c.id===qCatFilter)?.color}}>{cats.find(c=>c.id===qCatFilter)?.name}</strong></span>}
+                    </span>
+                    <button onClick={()=>{setQSearch("");setQCatFilter("all");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",textDecoration:"underline"}}>
+                      Effacer les filtres
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {cats.length===0&&<div style={{color:C.orange,fontSize:13,background:"#1a120822",border:`1px solid ${C.orange}44`,borderRadius:4,padding:"10px 14px",marginBottom:14}}>⚠ Créez d'abord une catégorie.</div>}
+
+              {filtered.length===0?(
+                <div style={{textAlign:"center",color:C.muted,padding:"50px 0"}}>
+                  <div style={{fontSize:36,marginBottom:12}}>🔍</div>
+                  <div style={{fontSize:15,marginBottom:6}}>{qs.length===0?"Aucune question.":"Aucun résultat pour cette recherche."}</div>
+                  {qs.length>0&&<div style={{fontSize:13}}>Essayez d'autres mots-clés ou changez les filtres.</div>}
+                </div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {filtered.map((q,idx)=>{
+                    const cat=cats.find(c=>c.id===q.catId);
+                    return (
+                      <div key={q.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,transition:"border-color 0.15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.border2} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+                        <div style={{display:"flex",alignItems:"center",gap:12,flex:1,minWidth:0}}>
+                          <span style={{color:C.muted,fontSize:11,fontFamily:"Oswald,sans-serif",fontWeight:700,flexShrink:0,minWidth:24,textAlign:"right"}}>{idx+1}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            {/* Surlignage du terme recherché */}
+                            <div style={{fontSize:14,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>
+                              {term ? q.text.split(new RegExp(`(${qSearch})`, "gi")).map((part,i)=>
+                                part.toLowerCase()===term
+                                  ? <mark key={i} style={{background:C.yellowL+"44",color:C.text,borderRadius:2,padding:"0 2px"}}>{part}</mark>
+                                  : part
+                              ) : q.text}
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              {cat&&<span style={{fontSize:11,color:cat.color,fontWeight:600,background:cat.color+"18",borderRadius:20,padding:"1px 8px"}}>{cat.name}</span>}
+                              <span style={{fontSize:11,color:C.muted}}>{q.opts.length} réponses</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:8,flexShrink:0}}>
+                          <button onClick={()=>{setSaveErr("");setEditQ({...q});}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.text2,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Éditer</button>
+                          <button onClick={()=>setDelConfirm({type:"q",id:q.id})} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>);
+          })()}
           {adminTab==="qs"&&editQ&&<QForm initial={editQ} cats={cats} qs={qs} onSave={saveQ} onCancel={()=>setEditQ(null)} saving={saving} saveErr={saveErr}/>}
 
           {adminTab==="cats"&&!editCat&&(<>
