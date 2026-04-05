@@ -54,19 +54,81 @@ const fmtTimer = s => {
 };
 const pct2col = p => p>=70 ? C.greenL : p>=50 ? C.orange : C.red;
 
+// ─── BADGE HELPERS ───────────────────────────────────────────────
+const _weeklyExams = r => {
+  const week=7*24*3600*1000;
+  return r.filter(x=>Date.now()-new Date(x.created_at).getTime()<week).length;
+};
+const _consecutiveDays = r => {
+  if(!r.length) return 0;
+  const days=[...new Set(r.map(x=>new Date(x.created_at).toDateString()))].sort((a,b)=>new Date(a)-new Date(b));
+  let max=1,cur=1;
+  for(let i=1;i<days.length;i++){
+    if(Math.round((new Date(days[i])-new Date(days[i-1]))/86400000)<=1){cur++;max=Math.max(max,cur);}else cur=1;
+  }
+  return max;
+};
+const _maxCatProgress = r => {
+  const bc={};
+  r.forEach(x=>{if(!x.cat_id)return;if(!bc[x.cat_id])bc[x.cat_id]=[];bc[x.cat_id].push(x);});
+  let max=0;
+  Object.values(bc).forEach(rs=>{
+    if(rs.length<2)return;
+    const s=rs.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+    max=Math.max(max,s[s.length-1].pct-s[0].pct);
+  });
+  return max;
+};
+const _hasRebound = r => {
+  const bc={};
+  r.forEach(x=>{if(!x.cat_id)return;if(!bc[x.cat_id])bc[x.cat_id]=[];bc[x.cat_id].push(x);});
+  return Object.values(bc).some(rs=>{
+    const s=rs.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+    let fail=false;
+    for(const x of s){if(x.pct<50)fail=true;if(fail&&x.pct>=70)return true;}
+    return false;
+  });
+};
+const _dailyCount = r => {
+  const today=new Date().toDateString();
+  return r.filter(x=>new Date(x.created_at).toDateString()===today).length;
+};
+
+// ─── GRADES & BADGES ─────────────────────────────────────────────
 const BADGES = [
-  { id:"first",   icon:"🔰", name:"Recrue",        desc:"1er questionnaire complété",         color:"#6b7280", check:(s)=>s.total>=1 },
-  { id:"quiz5",   icon:"📋", name:"Stagiaire",      desc:"5 questionnaires complétés",         color:"#a8966a", check:(s)=>s.total>=5 },
-  { id:"quiz20",  icon:"🎖️", name:"Sapeur",         desc:"20 questionnaires complétés",        color:"#b45309", check:(s)=>s.total>=20 },
-  { id:"quiz50",  icon:"🏅", name:"Caporal",        desc:"50 questionnaires complétés",        color:"#94a3b8", check:(s)=>s.total>=50 },
-  { id:"quiz100", icon:"⭐", name:"Sergent",        desc:"100 questionnaires complétés",       color:"#eab308", check:(s)=>s.total>=100 },
-  { id:"c100",    icon:"✅", name:"Centurion",      desc:"100 bonnes réponses au total",       color:"#22c55e", check:(s)=>s.correct>=100 },
-  { id:"c500",    icon:"🎯", name:"Tireur d'élite", desc:"500 bonnes réponses au total",       color:"#16a34a", check:(s)=>s.correct>=500 },
-  { id:"avg70",   icon:"📈", name:"Compétent",      desc:"Moyenne générale ≥ 70%",             color:"#3b82f6", check:(s)=>s.avg>=70&&s.total>=3 },
-  { id:"avg85",   icon:"🔥", name:"Expert",         desc:"Moyenne générale ≥ 85%",             color:"#f07320", check:(s)=>s.avg>=85&&s.total>=5 },
-  { id:"avg95",   icon:"💎", name:"Maître",         desc:"Moyenne générale ≥ 95%",             color:"#e8392a", check:(s)=>s.avg>=95&&s.total>=10 },
-  { id:"perfect", icon:"🏆", name:"Sans faute",     desc:"Score parfait 100% sur un examen",  color:"#eab308", check:(s)=>s.perfect },
-  { id:"poly",    icon:"🌐", name:"Polyvalent",     desc:"Examen dans toutes les catégories",  color:"#a855f7", check:(s,cats)=>cats.length>0&&s.uniqueCats>=cats.length },
+  // GRADES POMPIERS — progression exponentielle
+  { id:"g1",  icon:"🟦", name:"Auxiliaire",              grade:true, desc:"1 examen complété",                                                                          color:"#6b7280", check:(s)=>s.total>=1 },
+  { id:"g2",  icon:"🔴", name:"Sapeur 2e classe",         grade:true, desc:"3 examens · moy. ≥ 40%",                                                                     color:"#e8392a", check:(s)=>s.total>=3&&s.avg>=40 },
+  { id:"g3",  icon:"🔴🔴",name:"Sapeur 1re classe",       grade:true, desc:"10 examens · moy. ≥ 50%",                                                                    color:"#e8392a", check:(s)=>s.total>=10&&s.avg>=50 },
+  { id:"g4",  icon:"⚡",  name:"Caporal",                 grade:true, desc:"25 examens · moy. ≥ 55% · 200 bonnes rép.",                                                  color:"#e8392a", check:(s)=>s.total>=25&&s.avg>=55&&s.correct>=200 },
+  { id:"g5",  icon:"⚡⚡", name:"Caporal-chef",            grade:true, desc:"50 examens · moy. ≥ 60% · 500 bonnes rép.",                                                  color:"#f07320", check:(s)=>s.total>=50&&s.avg>=60&&s.correct>=500 },
+  { id:"g6",  icon:"📍",  name:"Sergent",                 grade:true, desc:"100 examens · moy. ≥ 65% · 1 500 bonnes rép.",                                               color:"#f07320", check:(s)=>s.total>=100&&s.avg>=65&&s.correct>=1500 },
+  { id:"g7",  icon:"📍📍", name:"Sergent-chef",            grade:true, desc:"200 examens · moy. ≥ 70% · 3 000 bonnes rép.",                                               color:"#eab308", check:(s)=>s.total>=200&&s.avg>=70&&s.correct>=3000 },
+  { id:"g8",  icon:"🏅",  name:"Adjudant",                grade:true, desc:"350 examens · moy. ≥ 73% · 5 500 bonnes rép.",                                               color:"#eab308", check:(s)=>s.total>=350&&s.avg>=73&&s.correct>=5500 },
+  { id:"g9",  icon:"🏅⭐", name:"Adjudant-chef",           grade:true, desc:"500 examens · moy. ≥ 76% · 8 000 bonnes rép. · 10 parfaits",                                color:"#94a3b8", check:(s)=>s.total>=500&&s.avg>=76&&s.correct>=8000&&s.perfects>=10 },
+  { id:"g10", icon:"⭐",  name:"Lieutenant",              grade:true, desc:"750 examens · moy. ≥ 79% · 12 000 bonnes rép. · 25 parfaits",                               color:"#94a3b8", check:(s)=>s.total>=750&&s.avg>=79&&s.correct>=12000&&s.perfects>=25 },
+  { id:"g11", icon:"⭐⭐", name:"Capitaine",               grade:true, desc:"1 000 examens · moy. ≥ 82% · 18 000 bonnes rép. · 50 parfaits",                            color:"#94a3b8", check:(s)=>s.total>=1000&&s.avg>=82&&s.correct>=18000&&s.perfects>=50 },
+  { id:"g12", icon:"🌟",  name:"Commandant",              grade:true, desc:"1 500 examens · moy. ≥ 85% · 28 000 bonnes rép. · 100 parfaits",                           color:"#b87333", check:(s)=>s.total>=1500&&s.avg>=85&&s.correct>=28000&&s.perfects>=100 },
+  { id:"g13", icon:"🌟🌟", name:"Lieutenant-colonel",     grade:true, desc:"2 500 examens · moy. ≥ 88% · 45 000 bonnes rép. · 200 parfaits",                           color:"#b87333", check:(s)=>s.total>=2500&&s.avg>=88&&s.correct>=45000&&s.perfects>=200 },
+  { id:"g14", icon:"👑",  name:"Colonel",                 grade:true, desc:"4 000 examens · moy. ≥ 91% · 70 000 bonnes rép. · 350 parfaits",                           color:"#eab308", check:(s)=>s.total>=4000&&s.avg>=91&&s.correct>=70000&&s.perfects>=350 },
+  { id:"g15", icon:"💫💫", name:"Contrôleur général",     grade:true, desc:"6 000 examens · moy. ≥ 95% · 100 000 bonnes rép. · 500 parfaits",                          color:"#eab308", check:(s)=>s.total>=6000&&s.avg>=95&&s.correct>=100000&&s.perfects>=500 },
+  { id:"g16", icon:"💎",  name:"Contrôleur gén. d'État",  grade:true, desc:"10 000 examens · moy. ≥ 98% · 150 000 bonnes rép. · 1 000 parfaits",                       color:"#e8392a", check:(s)=>s.total>=10000&&s.avg>=98&&s.correct>=150000&&s.perfects>=1000 },
+
+  // BADGES THÉMATIQUES
+  { id:"b1",  icon:"🔥", name:"Premier Feu",          desc:"Obtenir 100% pour la première fois",                              color:"#e8392a", check:(s)=>s.perfects>=1 },
+  { id:"b2",  icon:"🎯", name:"Tireur d'élite",        desc:"10 examens avec un score parfait (100%)",                        color:"#22c55e", check:(s)=>s.perfects>=10 },
+  { id:"b3",  icon:"💯", name:"Sniper",                desc:"50 examens avec un score parfait (100%)",                        color:"#16a34a", check:(s)=>s.perfects>=50 },
+  { id:"b4",  icon:"📋", name:"As de l'Examen Blanc",  desc:"Score parfait lors d'un Examen Blanc (40 questions)",            color:"#e8392a", check:(s,cats,r)=>r.some(x=>x.cat_name==="Examen Blanc"&&x.pct===100) },
+  { id:"b5",  icon:"🌐", name:"Encyclopédiste",        desc:"Au moins 1 examen dans chaque catégorie",                       color:"#3b82f6", check:(s,cats)=>cats.length>0&&s.uniqueCats>=cats.length },
+  { id:"b6",  icon:"📈", name:"Montée en puissance",   desc:"Progresser de +20 pts sur une même catégorie",                  color:"#22c55e", check:(s,cats,r)=>_maxCatProgress(r)>=20 },
+  { id:"b7",  icon:"💪", name:"Résilient",             desc:"Réussir (≥70%) après avoir échoué (<50%) dans une catégorie",   color:"#f07320", check:(s,cats,r)=>_hasRebound(r) },
+  { id:"b8",  icon:"📅", name:"Assidu",                desc:"Faire des examens 5 jours consécutifs",                         color:"#a855f7", check:(s,cats,r)=>_consecutiveDays(r)>=5 },
+  { id:"b9",  icon:"⚡", name:"Cadence de Feu",        desc:"10 examens en une seule semaine",                               color:"#eab308", check:(s,cats,r)=>_weeklyExams(r)>=10 },
+  { id:"b10", icon:"🧠", name:"Théoricien",            desc:"1 000 bonnes réponses au total",                                color:"#6b7280", check:(s)=>s.correct>=1000 },
+  { id:"b11", icon:"🏃", name:"Marathonien",           desc:"50 examens complétés",                                          color:"#3b82f6", check:(s)=>s.total>=50 },
+  { id:"b12", icon:"🌙", name:"Journée Marathon",      desc:"3 examens dans la même journée",                                color:"#7c3aed", check:(s,cats,r)=>_dailyCount(r)>=3 },
+  { id:"b13", icon:"🚒", name:"Toujours Debout",       desc:"Terminer 10 examens d'affilée avec ≥ 60%",                     color:"#e8392a", check:(s,cats,r)=>{const last10=r.slice(-10);return last10.length===10&&last10.every(x=>x.pct>=60);} },
+  { id:"b14", icon:"🔭", name:"Visionnaire",           desc:"Atteindre 90% de moyenne sur au moins 10 examens",             color:"#a855f7", check:(s)=>s.avg>=90&&s.total>=10 },
 ];
 
 const computeStats = results => ({
@@ -74,11 +136,12 @@ const computeStats = results => ({
   correct:    results.reduce((a,r)=>a+(r.score||0),0),
   avg:        results.length ? Math.round(results.reduce((a,r)=>a+r.pct,0)/results.length) : 0,
   perfect:    results.some(r=>r.pct===100),
+  perfects:   results.filter(r=>r.pct===100).length,
   uniqueCats: new Set(results.map(r=>r.cat_id).filter(Boolean)).size,
 });
 const getUnlocked = (results, cats) => {
   const s = computeStats(results);
-  return BADGES.filter(b=>b.check(s, cats));
+  return BADGES.filter(b=>b.check(s, cats, results));
 };
 
 // ─── UI ──────────────────────────────────────────────────────────
@@ -117,13 +180,18 @@ const StatCard = ({label,value,color=C.text}) => (
     <div style={{color:C.text2,fontSize:12,marginTop:6}}>{label}</div>
   </div>
 );
-const BadgeCard = ({badge,unlocked}) => (
-  <div title={badge.desc} style={{background:unlocked?C.card:C.surf,border:`1px solid ${unlocked?badge.color+"44":C.border}`,borderRadius:6,padding:"14px",textAlign:"center",opacity:unlocked?1:0.4,transition:"all 0.2s",position:"relative",overflow:"hidden"}}>
-    {unlocked&&<div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 0%, ${badge.color}18 0%, transparent 60%)`}}/>}
-    <div style={{fontSize:28,marginBottom:8}}>{badge.icon}</div>
-    <div style={{fontSize:11,fontWeight:700,color:unlocked?badge.color:C.muted,fontFamily:"Oswald,sans-serif",letterSpacing:1,textTransform:"uppercase"}}>{badge.name}</div>
-    <div style={{fontSize:10,color:C.muted,marginTop:4,lineHeight:1.4}}>{badge.desc}</div>
-    {unlocked&&<div style={{width:6,height:6,borderRadius:"50%",background:badge.color,margin:"8px auto 0",boxShadow:`0 0 8px ${badge.color}`}}/>}
+const BadgeCard = ({badge,unlocked,nextGrade,stats}) => (
+  <div title={badge.desc} style={{background:unlocked?C.card:C.surf,border:`1px solid ${unlocked?badge.color+"55":C.border}`,borderRadius:6,padding:badge.grade?"14px 12px":"12px 10px",textAlign:"center",opacity:unlocked?1:0.38,transition:"all 0.2s",position:"relative",overflow:"hidden",cursor:"default"}}>
+    {unlocked&&badge.grade&&<div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse at 50% 0%, ${badge.color}22 0%, transparent 65%)`}}/>}
+    {unlocked&&!badge.grade&&<div style={{position:"absolute",inset:0,background:`radial-gradient(circle at 50% 0%, ${badge.color}14 0%, transparent 60%)`}}/>}
+    <div style={{fontSize:badge.grade?26:22,marginBottom:6,filter:unlocked?`drop-shadow(0 0 6px ${badge.color}88)`:"none"}}>{badge.icon}</div>
+    <div style={{fontSize:badge.grade?10:9,fontWeight:700,color:unlocked?badge.color:C.muted,fontFamily:"Oswald,sans-serif",letterSpacing:0.8,textTransform:"uppercase",lineHeight:1.3,marginBottom:3}}>{badge.name}</div>
+    {badge.grade&&unlocked&&<div style={{width:20,height:2,borderRadius:99,background:badge.color,margin:"5px auto 0",boxShadow:`0 0 6px ${badge.color}`}}/>}
+    {!unlocked&&nextGrade&&stats&&(
+      <div style={{marginTop:6,fontSize:9,color:"#3a3a42"}}>
+        {stats.total}/{nextGrade.total||"—"}
+      </div>
+    )}
   </div>
 );
 
@@ -751,17 +819,56 @@ export default function App() {
           )}
 
           {/* Badges */}
-          {myResults.length>0&&(
-            <div>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-                <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Mes badges</span>
-                <span style={{color:C.muted,fontSize:12}}>{getUnlocked(myResults,cats).length}/{BADGES.length} débloqués</span>
+          {myResults.length>0&&(()=>{
+            const unlocked=getUnlocked(myResults,cats);
+            const unlockedIds=new Set(unlocked.map(b=>b.id));
+            const grades=BADGES.filter(b=>b.grade);
+            const thematic=BADGES.filter(b=>!b.grade);
+            const stats=computeStats(myResults);
+            // Grade actuel = dernier grade débloqué
+            const currentGradeIdx=grades.reduce((acc,b,i)=>unlockedIds.has(b.id)?i:acc,-1);
+            const currentGrade=grades[currentGradeIdx];
+            const nextGrade=grades[currentGradeIdx+1];
+            return (
+              <div>
+                {/* Grade actuel */}
+                {currentGrade&&(
+                  <div style={{background:`linear-gradient(135deg, ${currentGrade.color}18, ${currentGrade.color}06)`,border:`1px solid ${currentGrade.color}44`,borderRadius:8,padding:"18px 22px",marginBottom:28,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                    <div style={{fontSize:36,filter:`drop-shadow(0 0 12px ${currentGrade.color}88)`}}>{currentGrade.icon}</div>
+                    <div style={{flex:1,minWidth:200}}>
+                      <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,color:currentGrade.color,textTransform:"uppercase",marginBottom:4}}>Grade actuel</div>
+                      <div style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700,color:C.text}}>{currentGrade.name}</div>
+                      {nextGrade&&(
+                        <div style={{color:C.muted,fontSize:12,marginTop:4}}>Prochain grade : <strong style={{color:C.text2}}>{nextGrade.name}</strong> — {nextGrade.desc}</div>
+                      )}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontFamily:"Oswald,sans-serif",fontSize:28,fontWeight:700,color:currentGrade.color}}>{unlocked.length}<span style={{fontSize:14,color:C.muted}}>/{BADGES.length}</span></div>
+                      <div style={{color:C.muted,fontSize:11}}>badges débloqués</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Grades */}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                  <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Grades</span>
+                  <span style={{color:C.muted,fontSize:12}}>{grades.filter(b=>unlockedIds.has(b.id)).length}/{grades.length}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8,marginBottom:28}}>
+                  {grades.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)} stats={stats}/>)}
+                </div>
+
+                {/* Badges thématiques */}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                  <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Badges spéciaux</span>
+                  <span style={{color:C.muted,fontSize:12}}>{thematic.filter(b=>unlockedIds.has(b.id)).length}/{thematic.length}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8}}>
+                  {thematic.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
+                </div>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
-                {BADGES.map(b=><BadgeCard key={b.id} badge={b} unlocked={getUnlocked(myResults,cats).some(u=>u.id===b.id)}/>)}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </Wrap>
     );
@@ -940,10 +1047,39 @@ export default function App() {
               );
             })}
           </div>
-          <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:16}}>Badges</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10,marginBottom:32}}>
-            {BADGES.map(b=><BadgeCard key={b.id} badge={b} unlocked={badges.some(u=>u.id===b.id)}/>)}
-          </div>
+          <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:16}}>Grades & Badges</div>
+          {(()=>{
+            const unlocked=getUnlocked(myResults,cats);
+            const unlockedIds=new Set(unlocked.map(b=>b.id));
+            const grades=BADGES.filter(b=>b.grade);
+            const thematic=BADGES.filter(b=>!b.grade);
+            const stats=computeStats(myResults);
+            const currentGradeIdx=grades.reduce((acc,b,i)=>unlockedIds.has(b.id)?i:acc,-1);
+            const currentGrade=grades[currentGradeIdx];
+            const nextGrade=grades[currentGradeIdx+1];
+            return (
+              <div style={{marginBottom:32}}>
+                {currentGrade&&(
+                  <div style={{background:`linear-gradient(135deg,${currentGrade.color}18,${currentGrade.color}06)`,border:`1px solid ${currentGrade.color}44`,borderRadius:8,padding:"16px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                    <div style={{fontSize:32,filter:`drop-shadow(0 0 10px ${currentGrade.color}88)`}}>{currentGrade.icon}</div>
+                    <div style={{flex:1,minWidth:160}}>
+                      <div style={{fontFamily:"Oswald,sans-serif",fontSize:10,letterSpacing:3,color:currentGrade.color,textTransform:"uppercase",marginBottom:3}}>Grade actuel</div>
+                      <div style={{fontFamily:"Oswald,sans-serif",fontSize:20,fontWeight:700}}>{currentGrade.name}</div>
+                      {nextGrade&&<div style={{color:C.muted,fontSize:12,marginTop:3}}>Suivant : <strong style={{color:C.text2}}>{nextGrade.name}</strong></div>}
+                    </div>
+                  </div>
+                )}
+                <div style={{fontFamily:"Oswald,sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:10}}>Grades ({grades.filter(b=>unlockedIds.has(b.id)).length}/{grades.length})</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(85px,1fr))",gap:7,marginBottom:20}}>
+                  {grades.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)} stats={stats}/>)}
+                </div>
+                <div style={{fontFamily:"Oswald,sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:10}}>Badges spéciaux ({thematic.filter(b=>unlockedIds.has(b.id)).length}/{thematic.length})</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(85px,1fr))",gap:7}}>
+                  {thematic.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
+                </div>
+              </div>
+            );
+          })()}
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:16}}>Historique détaillé</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {myResults.map(r=>(
