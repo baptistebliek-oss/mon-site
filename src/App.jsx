@@ -97,7 +97,7 @@ const _dailyCount = r => {
 // ─── GRADES & BADGES ─────────────────────────────────────────────
 const BADGES = [
   // GRADES POMPIERS — progression exponentielle
-  { id:"g1",  icon:"🟦", name:"Auxiliaire",              grade:true, desc:"1 examen complété",                                                                          color:"#6b7280", check:(s)=>s.total>=1 },
+  { id:"g1",  icon:"🟦", name:"JSP",                    grade:true, desc:"1 examen complété",                                                                          color:"#6b7280", check:(s)=>s.total>=1 },
   { id:"g2",  icon:"🔴", name:"Sapeur 2e classe",         grade:true, desc:"3 examens · moy. ≥ 40%",                                                                     color:"#e8392a", check:(s)=>s.total>=3&&s.avg>=40 },
   { id:"g3",  icon:"🔴🔴",name:"Sapeur 1re classe",       grade:true, desc:"10 examens · moy. ≥ 50%",                                                                    color:"#e8392a", check:(s)=>s.total>=10&&s.avg>=50 },
   { id:"g4",  icon:"⚡",  name:"Caporal",                 grade:true, desc:"25 examens · moy. ≥ 55% · 200 bonnes rép.",                                                  color:"#e8392a", check:(s)=>s.total>=25&&s.avg>=55&&s.correct>=200 },
@@ -229,38 +229,48 @@ const GradeInsignia = ({ id, unlocked, size=52 }) => {
 
   const insignia = () => {
     switch(id){
-      case "g1":  // Auxiliaire — carré bleu
+      case "g1":  // JSP — carré bleu
         return <rect x={11} y={11} width={W-22} height={H-22} fill="#4f7be8" rx={2}/>;
-      case "g2":  // Sapeur 2e — 1 chevron rouge
+      case "g2":  // Sapeur 2e — fond noir uni, aucune bande
+        return null;
+      case "g3":  // Sapeur 1re — 1 chevron rouge
         return nDiag(1,"#e8392a",8);
-      case "g3":  // Sapeur 1re — 2 chevrons rouges
+      case "g4":  // Caporal — 2 chevrons rouges
         return nDiag(2,"#e8392a",7);
-      case "g4":  // Caporal — 3 chevrons rouges
+      case "g5":  // Caporal-chef — 3 chevrons rouges
         return nDiag(3,"#e8392a",6);
-      case "g5":  // Caporal-chef — 4 chevrons rouges
-        return nDiag(4,"#e8392a",5);
       case "g6":  // Sergent — 1 chevron blanc liseré rouge
         return nDiag(1,"#e8e6e1",9,"#e8392a");
-      case "g7":  // Sergent-chef — 4 chevrons blancs liserés rouge
-        return nDiag(4,"#e8e6e1",6,"#e8392a");
-      case "g8":  // Adjudant — 1 bande orange épaisse
-        return nHoriz(1,"#f07320",10);
-      case "g9":  // Adjudant-chef — 1 bande blanche épaisse
-        return nHoriz(1,"#e8e6e1",10);
+      case "g7":  // Sergent-chef — 3 chevrons blancs liserés rouge
+        return nDiag(3,"#e8e6e1",7,"#e8392a");
+      case "g8":  // Adjudant — 1 bande orange + liseré rouge au centre
+        return (
+          <g>
+            <Horiz y={H/2} color="#f07320" h={10}/>
+            <Horiz y={H/2} color="#e8392a" h={2}/>
+          </g>
+        );
+      case "g9":  // Adjudant-chef — 1 bande blanche + liseré rouge au centre
+        return (
+          <g>
+            <Horiz y={H/2} color="#e8e6e1" h={10}/>
+            <Horiz y={H/2} color="#e8392a" h={2}/>
+          </g>
+        );
       case "g10": // Lieutenant — 2 bandes blanches
         return nHoriz(2,"#e8e6e1",5);
       case "g11": // Capitaine — 3 bandes blanches
         return nHoriz(3,"#e8e6e1",5);
-      case "g12": // Commandant — 4 bandes (1 or + 3 blanches)
-        return nHoriz(4,(i)=>i===0?"#eab308":"#e8e6e1",4);
-      case "g13": // Lieutenant-colonel — 2 bandes or
-        return nHoriz(2,"#eab308",5);
+      case "g12": // Commandant — 4 bandes blanches
+        return nHoriz(4,"#e8e6e1",4);
+      case "g13": // Lieutenant-colonel — 5 bandes alternées blanc/or
+        return nHoriz(5,(i)=>i%2===0?"#e8e6e1":"#eab308",4);
       case "g14": // Colonel — 5 bandes blanches
         return nHoriz(5,"#e8e6e1",4);
-      case "g15": // Contrôleur général — 2 flocons or
-        return [W*0.32, W*0.68].map((cx,i)=><Flake key={i} cx={cx} cy={H/2} r={9} color="#eab308"/>);
-      case "g16": // Contrôleur général d'État — 3 flocons or
-        return [W*0.2, W*0.5, W*0.8].map((cx,i)=><Flake key={i} cx={cx} cy={H/2} r={8} color="#eab308"/>);
+      case "g15": // Contrôleur général — 2 flocons argentés
+        return [W*0.32, W*0.68].map((cx,i)=><Flake key={i} cx={cx} cy={H/2} r={9} color="#c0c8d8"/>);
+      case "g16": // Contrôleur général d'État — 3 flocons argentés
+        return [W*0.2, W*0.5, W*0.8].map((cx,i)=><Flake key={i} cx={cx} cy={H/2} r={8} color="#c0c8d8"/>);
       default: return null;
     }
   };
