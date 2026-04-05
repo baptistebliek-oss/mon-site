@@ -114,22 +114,90 @@ const BADGES = [
   { id:"g15", icon:"💫💫", name:"Contrôleur général",     grade:true, desc:"6 000 examens · moy. ≥ 95% · 100 000 bonnes rép. · 500 parfaits",                          color:"#eab308", check:(s)=>s.total>=6000&&s.avg>=95&&s.correct>=100000&&s.perfects>=500 },
   { id:"g16", icon:"💎",  name:"Contrôleur gén. d'État",  grade:true, desc:"10 000 examens · moy. ≥ 98% · 150 000 bonnes rép. · 1 000 parfaits",                       color:"#e8392a", check:(s)=>s.total>=10000&&s.avg>=98&&s.correct>=150000&&s.perfects>=1000 },
 
-  // BADGES THÉMATIQUES
-  { id:"b1",  icon:"🔥", name:"Premier Feu",          desc:"Obtenir 100% pour la première fois",                              color:"#e8392a", check:(s)=>s.perfects>=1 },
-  { id:"b2",  icon:"🎯", name:"Tireur d'élite",        desc:"10 examens avec un score parfait (100%)",                        color:"#22c55e", check:(s)=>s.perfects>=10 },
-  { id:"b3",  icon:"💯", name:"Sniper",                desc:"50 examens avec un score parfait (100%)",                        color:"#16a34a", check:(s)=>s.perfects>=50 },
-  { id:"b4",  icon:"📋", name:"As de l'Examen Blanc",  desc:"Score parfait lors d'un Examen Blanc (40 questions)",            color:"#e8392a", check:(s,cats,r)=>r.some(x=>x.cat_name==="Examen Blanc"&&x.pct===100) },
-  { id:"b5",  icon:"🌐", name:"Encyclopédiste",        desc:"Au moins 1 examen dans chaque catégorie",                       color:"#3b82f6", check:(s,cats)=>cats.length>0&&s.uniqueCats>=cats.length },
-  { id:"b6",  icon:"📈", name:"Montée en puissance",   desc:"Progresser de +20 pts sur une même catégorie",                  color:"#22c55e", check:(s,cats,r)=>_maxCatProgress(r)>=20 },
-  { id:"b7",  icon:"💪", name:"Résilient",             desc:"Réussir (≥70%) après avoir échoué (<50%) dans une catégorie",   color:"#f07320", check:(s,cats,r)=>_hasRebound(r) },
-  { id:"b8",  icon:"📅", name:"Assidu",                desc:"Faire des examens 5 jours consécutifs",                         color:"#a855f7", check:(s,cats,r)=>_consecutiveDays(r)>=5 },
-  { id:"b9",  icon:"⚡", name:"Cadence de Feu",        desc:"10 examens en une seule semaine",                               color:"#eab308", check:(s,cats,r)=>_weeklyExams(r)>=10 },
-  { id:"b10", icon:"🧠", name:"Théoricien",            desc:"1 000 bonnes réponses au total",                                color:"#6b7280", check:(s)=>s.correct>=1000 },
-  { id:"b11", icon:"🏃", name:"Marathonien",           desc:"50 examens complétés",                                          color:"#3b82f6", check:(s)=>s.total>=50 },
-  { id:"b12", icon:"🌙", name:"Journée Marathon",      desc:"3 examens dans la même journée",                                color:"#7c3aed", check:(s,cats,r)=>_dailyCount(r)>=3 },
-  { id:"b13", icon:"🚒", name:"Toujours Debout",       desc:"Terminer 10 examens d'affilée avec ≥ 60%",                     color:"#e8392a", check:(s,cats,r)=>{const last10=r.slice(-10);return last10.length===10&&last10.every(x=>x.pct>=60);} },
-  { id:"b14", icon:"🔭", name:"Visionnaire",           desc:"Atteindre 90% de moyenne sur au moins 10 examens",             color:"#a855f7", check:(s)=>s.avg>=90&&s.total>=10 },
+  // ── BONNES RÉPONSES — 8 niveaux exponentiels ─────────────────
+  { id:"r1", icon:"🎯", name:"Tireur",           fam:"rép", tier:1, desc:"50 bonnes réponses",          color:"#6b7280", check:(s)=>s.correct>=50 },
+  { id:"r2", icon:"🎯", name:"Précis",            fam:"rép", tier:2, desc:"200 bonnes réponses",         color:"#cd7f32", check:(s)=>s.correct>=200 },
+  { id:"r3", icon:"🎯", name:"Sniper",            fam:"rép", tier:3, desc:"500 bonnes réponses",         color:"#94a3b8", check:(s)=>s.correct>=500 },
+  { id:"r4", icon:"🎯", name:"Expert",            fam:"rép", tier:4, desc:"1 000 bonnes réponses",       color:"#eab308", check:(s)=>s.correct>=1000 },
+  { id:"r5", icon:"🎯", name:"Maître Tireur",     fam:"rép", tier:5, desc:"2 500 bonnes réponses",       color:"#06b6d4", check:(s)=>s.correct>=2500 },
+  { id:"r6", icon:"🎯", name:"Légende",           fam:"rép", tier:6, desc:"5 000 bonnes réponses",       color:"#a855f7", check:(s)=>s.correct>=5000 },
+  { id:"r7", icon:"🎯", name:"Indestructible",    fam:"rép", tier:7, desc:"10 000 bonnes réponses",      color:"#e8392a", check:(s)=>s.correct>=10000 },
+  { id:"r8", icon:"🎯", name:"Mythique",          fam:"rép", tier:8, desc:"25 000 bonnes réponses",      color:"#f07320", check:(s)=>s.correct>=25000 },
+
+  // ── EXAMENS RÉALISÉS — 8 niveaux ────────────────────────────
+  { id:"e1", icon:"📋", name:"Recrue",            fam:"exm", tier:1, desc:"5 examens réalisés",          color:"#6b7280", check:(s)=>s.total>=5 },
+  { id:"e2", icon:"📋", name:"Engagé",            fam:"exm", tier:2, desc:"15 examens",                  color:"#cd7f32", check:(s)=>s.total>=15 },
+  { id:"e3", icon:"📋", name:"Régulier",          fam:"exm", tier:3, desc:"40 examens",                  color:"#94a3b8", check:(s)=>s.total>=40 },
+  { id:"e4", icon:"📋", name:"Assidu",            fam:"exm", tier:4, desc:"100 examens",                 color:"#eab308", check:(s)=>s.total>=100 },
+  { id:"e5", icon:"📋", name:"Vétéran",           fam:"exm", tier:5, desc:"250 examens",                 color:"#06b6d4", check:(s)=>s.total>=250 },
+  { id:"e6", icon:"📋", name:"Aguerri",           fam:"exm", tier:6, desc:"500 examens",                 color:"#a855f7", check:(s)=>s.total>=500 },
+  { id:"e7", icon:"📋", name:"Élite",             fam:"exm", tier:7, desc:"1 000 examens",               color:"#e8392a", check:(s)=>s.total>=1000 },
+  { id:"e8", icon:"📋", name:"Intouchable",       fam:"exm", tier:8, desc:"2 500 examens",               color:"#f07320", check:(s)=>s.total>=2500 },
+
+  // ── EXAMENS PARFAITS 100% — 7 niveaux ───────────────────────
+  { id:"p1", icon:"💯", name:"Première Flamme",   fam:"prf", tier:1, desc:"1 examen à 100%",             color:"#6b7280", check:(s)=>s.perfects>=1 },
+  { id:"p2", icon:"💯", name:"Flamme Pure",        fam:"prf", tier:2, desc:"5 examens à 100%",            color:"#cd7f32", check:(s)=>s.perfects>=5 },
+  { id:"p3", icon:"💯", name:"Sans Faute",         fam:"prf", tier:3, desc:"15 examens à 100%",           color:"#94a3b8", check:(s)=>s.perfects>=15 },
+  { id:"p4", icon:"💯", name:"Perfection",         fam:"prf", tier:4, desc:"40 examens à 100%",           color:"#eab308", check:(s)=>s.perfects>=40 },
+  { id:"p5", icon:"💯", name:"Absolu",             fam:"prf", tier:5, desc:"100 examens à 100%",          color:"#06b6d4", check:(s)=>s.perfects>=100 },
+  { id:"p6", icon:"💯", name:"Divin",              fam:"prf", tier:6, desc:"300 examens à 100%",          color:"#a855f7", check:(s)=>s.perfects>=300 },
+  { id:"p7", icon:"💯", name:"Au-delà du Bien",    fam:"prf", tier:7, desc:"750 examens à 100%",          color:"#e8392a", check:(s)=>s.perfects>=750 },
+
+  // ── EXCELLENCE ≥ 90% — 6 niveaux ────────────────────────────
+  { id:"n1", icon:"⭐", name:"Prometteur",         fam:"exc", tier:1, desc:"5 examens à 90%+",            color:"#6b7280", check:(s)=>s.above90>=5 },
+  { id:"n2", icon:"⭐", name:"Brillant",           fam:"exc", tier:2, desc:"20 examens à 90%+",           color:"#cd7f32", check:(s)=>s.above90>=20 },
+  { id:"n3", icon:"⭐", name:"Distingué",          fam:"exc", tier:3, desc:"60 examens à 90%+",           color:"#94a3b8", check:(s)=>s.above90>=60 },
+  { id:"n4", icon:"⭐", name:"Exceptionnel",       fam:"exc", tier:4, desc:"150 examens à 90%+",          color:"#eab308", check:(s)=>s.above90>=150 },
+  { id:"n5", icon:"⭐", name:"Élite des Élites",   fam:"exc", tier:5, desc:"400 examens à 90%+",          color:"#06b6d4", check:(s)=>s.above90>=400 },
+  { id:"n6", icon:"⭐", name:"Intouchable",        fam:"exc", tier:6, desc:"1 000 examens à 90%+",        color:"#a855f7", check:(s)=>s.above90>=1000 },
+
+  // ── RÉUSSITE ≥ 80% — 5 niveaux ──────────────────────────────
+  { id:"q1", icon:"🔥", name:"Solide",             fam:"80p", tier:1, desc:"10 examens à 80%+",           color:"#6b7280", check:(s)=>s.above80>=10 },
+  { id:"q2", icon:"🔥", name:"Performant",         fam:"80p", tier:2, desc:"40 examens à 80%+",           color:"#cd7f32", check:(s)=>s.above80>=40 },
+  { id:"q3", icon:"🔥", name:"Irréprochable",      fam:"80p", tier:3, desc:"120 examens à 80%+",          color:"#94a3b8", check:(s)=>s.above80>=120 },
+  { id:"q4", icon:"🔥", name:"Invaincu",           fam:"80p", tier:4, desc:"350 examens à 80%+",          color:"#eab308", check:(s)=>s.above80>=350 },
+  { id:"q5", icon:"🔥", name:"Phénomène",          fam:"80p", tier:5, desc:"800 examens à 80%+",          color:"#06b6d4", check:(s)=>s.above80>=800 },
+
+  // ── ASSIDUITÉ — JOURS CONSÉCUTIFS — 6 niveaux ───────────────
+  { id:"d1", icon:"📅", name:"Régulier",           fam:"day", tier:1, desc:"3 jours consécutifs",         color:"#6b7280", check:(s,c,r)=>_consecutiveDays(r)>=3 },
+  { id:"d2", icon:"📅", name:"Dévoué",             fam:"day", tier:2, desc:"7 jours consécutifs",         color:"#cd7f32", check:(s,c,r)=>_consecutiveDays(r)>=7 },
+  { id:"d3", icon:"📅", name:"Persévérant",        fam:"day", tier:3, desc:"14 jours consécutifs",        color:"#94a3b8", check:(s,c,r)=>_consecutiveDays(r)>=14 },
+  { id:"d4", icon:"📅", name:"Intransigeant",      fam:"day", tier:4, desc:"30 jours consécutifs",        color:"#eab308", check:(s,c,r)=>_consecutiveDays(r)>=30 },
+  { id:"d5", icon:"📅", name:"Inconditionnel",     fam:"day", tier:5, desc:"60 jours consécutifs",        color:"#06b6d4", check:(s,c,r)=>_consecutiveDays(r)>=60 },
+  { id:"d6", icon:"📅", name:"Légionnaire",        fam:"day", tier:6, desc:"100 jours consécutifs",       color:"#a855f7", check:(s,c,r)=>_consecutiveDays(r)>=100 },
+
+  // ── CADENCE HEBDOMADAIRE — 4 niveaux ────────────────────────
+  { id:"w1", icon:"⚡", name:"Actif",              fam:"wkl", tier:1, desc:"5 examens en une semaine",    color:"#6b7280", check:(s,c,r)=>_weeklyExams(r)>=5 },
+  { id:"w2", icon:"⚡", name:"Intensif",           fam:"wkl", tier:2, desc:"10 examens en une semaine",   color:"#cd7f32", check:(s,c,r)=>_weeklyExams(r)>=10 },
+  { id:"w3", icon:"⚡", name:"Turbo",              fam:"wkl", tier:3, desc:"20 examens en une semaine",   color:"#94a3b8", check:(s,c,r)=>_weeklyExams(r)>=20 },
+  { id:"w4", icon:"⚡", name:"Machine de Guerre",  fam:"wkl", tier:4, desc:"50 examens en une semaine",   color:"#eab308", check:(s,c,r)=>_weeklyExams(r)>=50 },
+
+  // ── CATÉGORIES MAÎTRISÉES (moy ≥ 80%) — 4 niveaux ──────────
+  { id:"m1", icon:"🏆", name:"Spécialiste",        fam:"cat", tier:1, desc:"1 catégorie maîtrisée (moy. ≥ 80%)",       color:"#cd7f32", check:(s,c,r)=>_masteredCats(r)>=1 },
+  { id:"m2", icon:"🏆", name:"Polyvalent",         fam:"cat", tier:2, desc:"2 catégories maîtrisées",                   color:"#94a3b8", check:(s,c,r)=>_masteredCats(r)>=2 },
+  { id:"m3", icon:"🏆", name:"Encyclopédiste",     fam:"cat", tier:3, desc:"3 catégories maîtrisées",                   color:"#eab308", check:(s,c,r)=>_masteredCats(r)>=3 },
+  { id:"m4", icon:"🏆", name:"Omniscient",         fam:"cat", tier:4, desc:"Toutes les catégories maîtrisées",          color:"#e8392a", check:(s,cats,r)=>cats.length>0&&_masteredCats(r)>=cats.length },
+
+  // ── PROGRESSION SUR UNE CATÉGORIE — 4 niveaux ───────────────
+  { id:"g_1", icon:"📈", name:"En Progression",    fam:"prg", tier:1, desc:"Progression de +10 pts sur une catégorie", color:"#6b7280", check:(s,c,r)=>_maxCatProgress(r)>=10 },
+  { id:"g_2", icon:"📈", name:"Montée en Flèche",  fam:"prg", tier:2, desc:"Progression de +20 pts",                   color:"#cd7f32", check:(s,c,r)=>_maxCatProgress(r)>=20 },
+  { id:"g_3", icon:"📈", name:"Ascension",         fam:"prg", tier:3, desc:"Progression de +35 pts",                   color:"#94a3b8", check:(s,c,r)=>_maxCatProgress(r)>=35 },
+  { id:"g_4", icon:"📈", name:"Transformation",    fam:"prg", tier:4, desc:"Progression de +50 pts",                   color:"#eab308", check:(s,c,r)=>_maxCatProgress(r)>=50 },
+
+  // ── BADGES SPÉCIAUX ──────────────────────────────────────────
+  { id:"x1", icon:"💪", name:"Résilient",          desc:"Réussir ≥70% après un échec <50% dans une catégorie",         color:"#f07320", check:(s,c,r)=>_hasRebound(r) },
+  { id:"x2", icon:"📝", name:"As de l'Examen Blanc",desc:"Score parfait sur un Examen Blanc",                          color:"#e8392a", check:(s,c,r)=>r.some(x=>x.cat_name==="Examen Blanc"&&x.pct===100) },
+  { id:"x3", icon:"🌙", name:"Journée Marathon",   desc:"3 examens dans la même journée",                              color:"#7c3aed", check:(s,c,r)=>_dailyCount(r)>=3 },
+  { id:"x4", icon:"🚒", name:"Toujours Debout",    desc:"10 examens consécutifs tous ≥ 60%",                           color:"#e8392a", check:(s,c,r)=>{const l=r.slice(-10);return l.length===10&&l.every(x=>x.pct>=60);} },
+  { id:"x5", icon:"🔭", name:"Visionnaire",        desc:"Moyenne générale ≥ 90% sur 10+ examens",                     color:"#a855f7", check:(s)=>s.avg>=90&&s.total>=10 },
+  { id:"x6", icon:"🌐", name:"Explorateur",        desc:"Au moins 1 examen dans chaque catégorie",                    color:"#3b82f6", check:(s,cats)=>cats.length>0&&s.uniqueCats>=cats.length },
 ];
+
+const _masteredCats = (results, threshold=80) => {
+  const bc={};
+  results.forEach(r=>{if(!r.cat_id)return;if(!bc[r.cat_id])bc[r.cat_id]=[];bc[r.cat_id].push(r);});
+  return Object.values(bc).filter(rs=>Math.round(rs.reduce((a,r)=>a+r.pct,0)/rs.length)>=threshold).length;
+};
 
 const computeStats = results => ({
   total:      results.length,
@@ -137,6 +205,8 @@ const computeStats = results => ({
   avg:        results.length ? Math.round(results.reduce((a,r)=>a+r.pct,0)/results.length) : 0,
   perfect:    results.some(r=>r.pct===100),
   perfects:   results.filter(r=>r.pct===100).length,
+  above90:    results.filter(r=>r.pct>=90).length,
+  above80:    results.filter(r=>r.pct>=80).length,
   uniqueCats: new Set(results.map(r=>r.cat_id).filter(Boolean)).size,
 });
 const getUnlocked = (results, cats) => {
@@ -934,15 +1004,30 @@ export default function App() {
 
           {/* Badges */}
           {myResults.length>0&&(()=>{
-            const unlocked=getUnlocked(myResults,cats);
-            const unlockedIds=new Set(unlocked.map(b=>b.id));
-            const grades=BADGES.filter(b=>b.grade);
-            const thematic=BADGES.filter(b=>!b.grade);
-            const stats=computeStats(myResults);
-            // Grade actuel = dernier grade débloqué
-            const currentGradeIdx=grades.reduce((acc,b,i)=>unlockedIds.has(b.id)?i:acc,-1);
-            const currentGrade=grades[currentGradeIdx];
-            const nextGrade=grades[currentGradeIdx+1];
+            const unlocked   = getUnlocked(myResults,cats);
+            const unlockedIds= new Set(unlocked.map(b=>b.id));
+            const grades     = BADGES.filter(b=>b.grade);
+            const thematic   = BADGES.filter(b=>!b.grade);
+            const stats      = computeStats(myResults);
+            const currentGradeIdx = grades.reduce((acc,b,i)=>unlockedIds.has(b.id)?i:acc,-1);
+            const currentGrade= grades[currentGradeIdx];
+            const nextGrade  = grades[currentGradeIdx+1];
+
+            // Familles de badges thématiques
+            const FAM_META = {
+              rép: { label:"🎯 Bonnes réponses",          color:"#eab308" },
+              exm: { label:"📋 Examens réalisés",         color:"#3b82f6" },
+              prf: { label:"💯 Examens parfaits (100%)",  color:"#22c55e" },
+              exc: { label:"⭐ Excellence (≥ 90%)",       color:"#06b6d4" },
+              "80p":{ label:"🔥 Réussite (≥ 80%)",       color:"#f07320" },
+              day: { label:"📅 Assiduité",                color:"#a855f7" },
+              wkl: { label:"⚡ Cadence hebdomadaire",     color:"#94a3b8" },
+              cat: { label:"🏆 Catégories maîtrisées",    color:"#cd7f32" },
+              prg: { label:"📈 Progression",              color:"#94a3b8" },
+            };
+            const famKeys = Object.keys(FAM_META);
+            const specials = thematic.filter(b=>!b.fam);
+
             return (
               <div>
                 {/* Grade actuel */}
@@ -952,9 +1037,7 @@ export default function App() {
                     <div style={{flex:1,minWidth:200}}>
                       <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,color:currentGrade.color,textTransform:"uppercase",marginBottom:4}}>Grade actuel</div>
                       <div style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700,color:C.text}}>{currentGrade.name}</div>
-                      {nextGrade&&(
-                        <div style={{color:C.muted,fontSize:12,marginTop:4}}>Prochain grade : <strong style={{color:C.text2}}>{nextGrade.name}</strong> — {nextGrade.desc}</div>
-                      )}
+                      {nextGrade&&<div style={{color:C.muted,fontSize:12,marginTop:4}}>Prochain : <strong style={{color:C.text2}}>{nextGrade.name}</strong> — {nextGrade.desc}</div>}
                     </div>
                     <div style={{textAlign:"right",flexShrink:0}}>
                       <div style={{fontFamily:"Oswald,sans-serif",fontSize:28,fontWeight:700,color:currentGrade.color}}>{unlocked.length}<span style={{fontSize:14,color:C.muted}}>/{BADGES.length}</span></div>
@@ -968,17 +1051,43 @@ export default function App() {
                   <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Grades</span>
                   <span style={{color:C.muted,fontSize:12}}>{grades.filter(b=>unlockedIds.has(b.id)).length}/{grades.length}</span>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8,marginBottom:28}}>
-                  {grades.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)} stats={stats}/>)}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:8,marginBottom:32}}>
+                  {grades.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
                 </div>
 
-                {/* Badges thématiques */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                {/* Familles thématiques */}
+                {famKeys.map(fk=>{
+                  const fam=BADGES.filter(b=>b.fam===fk).sort((a,b2)=>a.tier-b2.tier);
+                  const famUnlocked=fam.filter(b=>unlockedIds.has(b.id)).length;
+                  const nextInFam=fam.find(b=>!unlockedIds.has(b.id));
+                  const meta=FAM_META[fk];
+                  return (
+                    <div key={fk} style={{marginBottom:24}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                        <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:meta.color}}>{meta.label}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          {nextInFam&&<span style={{color:C.muted,fontSize:11}}>Suivant : <strong style={{color:C.text2}}>{nextInFam.desc}</strong></span>}
+                          <span style={{color:C.muted,fontSize:11}}>{famUnlocked}/{fam.length}</span>
+                        </div>
+                      </div>
+                      {/* Barre de progression famille */}
+                      <div style={{background:C.border,borderRadius:99,height:3,marginBottom:10,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${fam.length?famUnlocked/fam.length*100:0}%`,background:meta.color,borderRadius:99,transition:"width 0.5s"}}/>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:`repeat(${fam.length},1fr)`,gap:6}}>
+                        {fam.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Badges spéciaux */}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                   <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Badges spéciaux</span>
-                  <span style={{color:C.muted,fontSize:12}}>{thematic.filter(b=>unlockedIds.has(b.id)).length}/{thematic.length}</span>
+                  <span style={{color:C.muted,fontSize:12}}>{specials.filter(b=>unlockedIds.has(b.id)).length}/{specials.length}</span>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8}}>
-                  {thematic.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:8}}>
+                  {specials.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
                 </div>
               </div>
             );
