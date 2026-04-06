@@ -873,6 +873,10 @@ export default function App() {
   // Admin pending questions
   const [pendingQs,setPendingQs]   = useState([]);
 
+  // Formateur session form & question form (hooks au niveau racine — règle React)
+  const [sf,setSf]   = useState({title:"",description:"",cat_ids:[],max_questions:20});
+  const [pqf,setPqf] = useState({catId:"",text:"",opts:["","","",""],correct:0,expl:""});
+
   const [adminTab,setAdminTab]       = useState("qs");
   const [editQ,setEditQ]             = useState(null);
   const [editCat,setEditCat]         = useState(null);
@@ -2394,13 +2398,6 @@ export default function App() {
     const siteUrl = window.location.origin+window.location.pathname;
     const qrUrl = id => `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(siteUrl+"?session="+id)}&bgcolor=0e0e14&color=e8e6e1&margin=10`;
     const sessionLink = id => siteUrl+"?session="+id;
-
-    // Formulaire de session
-    const [sf,setSf] = useState({title:"",description:"",cat_ids:[],max_questions:20});
-    const editingSession = editSession ? mySessions.find(s=>s.id===editSession)||{id:editSession,...sf} : null;
-
-    // Formulaire question
-    const [pqf,setPqf] = useState({catId:cats[0]?.id||"",text:"",opts:["","","",""],correct:0,expl:""});
 
     return (
       <Wrap>
