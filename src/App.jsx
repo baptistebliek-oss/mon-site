@@ -876,6 +876,11 @@ export default function App() {
   // Formateur session form & question form (hooks au niveau racine — règle React)
   const [sf,setSf]   = useState({title:"",description:"",cat_ids:[],max_questions:20});
   const [pqf,setPqf] = useState({catId:"",text:"",opts:["","","",""],correct:0,expl:""});
+  const [qrFullscreen,setQrFullscreen] = useState(null); // session object
+  const [sessionQs,setSessionQs]       = useState({}); // { sessionId: [questions] }
+  const [editSessionQ,setEditSessionQ] = useState(null); // null | "new" | question object
+  const [sqf,setSqf] = useState({text:"",opts:["","","",""],correct:0,expl:""}); // session question form
+  const [sqSaving,setSqSaving] = useState(false);
 
   const [adminTab,setAdminTab]       = useState("qs");
   const [editQ,setEditQ]             = useState(null);
@@ -1090,6 +1095,59 @@ export default function App() {
     const pct=Math.round((sc/total)*100);
     await sb.from("session_results").insert({session_id:pubSession.id,participant_name:pubName,score:sc,total,pct,answers:pubAnswers.current});
     setPubDone(true);
+  };
+
+  // ── SESSION QUESTIONS (questions propres à une session) ──────
+  const loadSessionQs = async (sessionId) => {
+    const {data} = await sb.from("pending_questions").select("*")
+      .eq("session_id", sessionId).order("created_at");
+    if(data) setSessionQs(prev=>({...prev,[sessionId]:data.map(q=>({
+      id:q.id, text:q.text, opts:q.options, correct:q.correct_index, expl:q.explanation||""
+    }))}));
+    return data||[];
+  };
+
+  const saveSessionQ = async (sessionId) => {
+    if(!sqf.text.trim()||!sqf.opts.every(o=>o.trim())) return;
+    setSqSaving(true);
+    const payload = {
+      formateur_id: user.id, formateur_name: pseudo,
+      session_id: sessionId,
+      cat_id: null, // question de session, pas de catégorie obligatoire
+      text: sqf.text, options: sqf.opts,
+      correct_index: sqf.correct, explanation: sqf.expl||"",
+      status: "pending"
+    };
+    if(editSessionQ && editSessionQ!=="new") {
+      await sb.from("pending_questions").update(payload).eq("id", editSessionQ.id);
+    } else {
+      await sb.from("pending_questions").insert(payload);
+    }
+    await loadSessionQs(sessionId);
+    setEditSessionQ(null);
+    setSqf({text:"",opts:["","","",""],correct:0,expl:""});
+    setSqSaving(false);
+  };
+
+  const deleteSessionQ = async (qId, sessionId) => {
+    await sb.from("pending_questions").delete().eq("id", qId);
+    await loadSessionQs(sessionId);
+  };
+
+  // ── QR CODE DOWNLOAD ────────────────────────────────────────
+  const downloadQR = async (session) => {
+    const siteUrl = window.location.origin+window.location.pathname;
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(siteUrl+"?session="+session.id)}&bgcolor=0e0e14&color=e8e6e1&margin=10`;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `QR-${session.title.replace(/\s+/g,"-")}.png`;
+      a.click();
+    } catch {
+      window.open(url,"_blank");
+    }
   };
 
   // ── AUTH ─────────────────────────────────────────────────────
@@ -2484,18 +2542,83 @@ export default function App() {
                         </div>
                         {/* QR Code */}
                         <div style={{textAlign:"center",flexShrink:0}}>
-                          <img src={qrUrl(s.id)} alt="QR" style={{width:120,height:120,borderRadius:6,border:`1px solid ${C.border}`}}/>
+                          <img src={qrUrl(s.id)} alt="QR" style={{width:120,height:120,borderRadius:6,border:`1px solid ${C.border}`,cursor:"pointer"}} onClick={()=>setQrFullscreen(s)}/>
                           <div style={{color:C.muted,fontSize:10,marginTop:4}}>Scanner pour accéder</div>
+                          <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"center"}}>
+                            <button onClick={()=>downloadQR(s)} title="Télécharger le QR code" style={{background:C.purple+"22",border:`1px solid ${C.purple}44`,color:C.purpleL,borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>⬇ Télécharger</button>
+                            <button onClick={()=>setQrFullscreen(s)} title="Afficher en plein écran" style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>⛶ Agrandir</button>
+                          </div>
                         </div>
                       </div>
-                      {/* Actions + résultats */}
-                      <div style={{borderTop:`1px solid ${C.border}`,padding:"10px 20px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-                        <button onClick={async()=>{await loadSessionResults(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>📊 Voir les résultats</button>
-                        <button onClick={()=>{setSf({title:s.title,description:s.description||"",cat_ids:s.cat_ids||[],max_questions:s.max_questions});setEditSession(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Modifier</button>
-                        <button onClick={async()=>{if(window.confirm("Supprimer cette session ?"))await sb.from("sessions").delete().eq("id",s.id).then(()=>loadMySessions());}} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
+                      {/* Actions + questions de session + résultats */}
+                      <div style={{borderTop:`1px solid ${C.border}`,padding:"12px 20px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:10}}>
+                          <button onClick={async()=>{await loadSessionResults(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>📊 Résultats</button>
+                          <button onClick={async()=>{await loadSessionQs(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>📝 Questions ({(sessionQs[s.id]||[]).length})</button>
+                          <button onClick={()=>{setSf({title:s.title,description:s.description||"",cat_ids:s.cat_ids||[],max_questions:s.max_questions});setEditSession(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Modifier</button>
+                          <button onClick={async()=>{if(window.confirm("Supprimer cette session ?"))await sb.from("sessions").delete().eq("id",s.id).then(()=>loadMySessions());}} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑 Supprimer</button>
+                        </div>
+
+                        {/* Questions de la session */}
+                        {sessionQs[s.id]!==undefined&&(
+                          <div style={{marginBottom:10}}>
+                            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                              <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:2,textTransform:"uppercase",color:C.purple}}>📝 Questions propres à cette session</span>
+                              <button onClick={()=>{setSqf({text:"",opts:["","","",""],correct:0,expl:""});setEditSessionQ({sid:s.id,id:"new"});}} style={{background:C.purple+"22",border:`1px solid ${C.purple}44`,color:C.purpleL,borderRadius:4,padding:"4px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>+ Ajouter une question</button>
+                            </div>
+                            <div style={{background:"#0a0a14",border:`1px solid ${C.purple}22`,borderRadius:4,padding:"10px 14px",marginBottom:10,fontSize:12,color:C.muted,lineHeight:1.6}}>
+                              💡 Ces questions sont <strong style={{color:C.text}}>utilisées uniquement dans cette session</strong>. Elles sont automatiquement soumises à l'admin pour éventuelle intégration dans la base commune.
+                            </div>
+
+                            {/* Formulaire question de session */}
+                            {editSessionQ?.sid===s.id&&(
+                              <div style={{background:C.card,border:`1px solid ${C.purple}44`,borderRadius:6,padding:"16px 18px",marginBottom:10}}>
+                                <div style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,textTransform:"uppercase",color:C.purple,marginBottom:14}}>{editSessionQ.id==="new"?"Nouvelle question":"Modifier la question"}</div>
+                                <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                                  <div><FL>Intitulé de la question *</FL><Field value={sqf.text} onChange={e=>setSqf(x=>({...x,text:e.target.value}))} placeholder="Saisissez votre question..." rows={2}/></div>
+                                  <div>
+                                    <FL>Options — cliquez la lettre pour la bonne réponse *</FL>
+                                    {sqf.opts.map((opt,i)=>(
+                                      <div key={i} style={{display:"flex",gap:10,marginBottom:8,alignItems:"center"}}>
+                                        <button onClick={()=>setSqf(x=>({...x,correct:i}))} style={{width:32,height:32,flexShrink:0,border:`2px solid ${sqf.correct===i?C.greenL:C.border2}`,borderRadius:4,background:sqf.correct===i?"#0a2214":"transparent",color:sqf.correct===i?C.greenL:C.muted,fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>{LABELS[i]}</button>
+                                        <input value={opt||""} onChange={e=>{const o=[...sqf.opts];o[i]=e.target.value;setSqf(x=>({...x,opts:o}));}} placeholder={`Réponse ${LABELS[i]}`} style={{flex:1,background:C.surf,border:`1px solid ${sqf.correct===i?"#1a4a28":C.border2}`,borderRadius:4,color:C.text,padding:"9px 12px",fontSize:13,fontFamily:"'Barlow',sans-serif",outline:"none"}}/>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div><FL>Explication (optionnel)</FL><Field value={sqf.expl||""} onChange={e=>setSqf(x=>({...x,expl:e.target.value}))} placeholder="Affichée après la réponse..." rows={2}/></div>
+                                  <div style={{display:"flex",gap:10}}>
+                                    <button onClick={async()=>{ if(!sqf.text.trim()||!sqf.opts.every(o=>o.trim()))return; await saveSessionQ(s.id); }} disabled={sqSaving||!sqf.text.trim()||!sqf.opts.every(o=>o.trim())} style={{background:sqSaving?C.faint:C.purple,color:"#fff",border:"none",borderRadius:4,padding:"9px 20px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:13}}>
+                                      {sqSaving?"Enregistrement...":"✓ Enregistrer"}
+                                    </button>
+                                    <Btn onClick={()=>setEditSessionQ(null)} ghost>Annuler</Btn>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Liste questions de session */}
+                            {sessionQs[s.id].length===0&&!editSessionQ?<div style={{color:C.muted,fontSize:13,textAlign:"center",padding:"16px 0"}}>Aucune question. Cliquez "+ Ajouter une question" pour en créer.</div>:(
+                              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                                {sessionQs[s.id].map((q,qi)=>(
+                                  <div key={q.id} style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:4,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                                    <div style={{flex:1,minWidth:0}}>
+                                      <div style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{qi+1}. {q.text}</div>
+                                      <div style={{color:C.greenL,fontSize:11,marginTop:2}}>✓ {q.opts[q.correct]}</div>
+                                    </div>
+                                    <div style={{display:"flex",gap:6,flexShrink:0}}>
+                                      <button onClick={()=>{setSqf({text:q.text,opts:q.opts,correct:q.correct,expl:q.expl});setEditSessionQ({sid:s.id,id:q.id});}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"3px 9px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏</button>
+                                      <button onClick={()=>deleteSessionQ(q.id,s.id)} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"3px 8px",cursor:"pointer",fontSize:11}}>🗑</button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Résultats inline */}
                         {res&&(
-                          <div style={{width:"100%",marginTop:10}}>
+                          <div style={{marginTop:6}}>
                             <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:8}}>{res.length} participant{res.length!==1?"s":""}</div>
                             {res.length===0?<div style={{color:C.muted,fontSize:13}}>Aucun participant pour le moment.</div>:(
                               <div style={{display:"flex",flexDirection:"column",gap:5}}>
@@ -2586,16 +2709,39 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {/* ── MODAL QR PLEIN ÉCRAN ── */}
+        {qrFullscreen&&(
+          <div onClick={()=>setQrFullscreen(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:24,cursor:"pointer"}}>
+            <div style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:3,textTransform:"uppercase",color:C.purple}}>{qrFullscreen.title}</div>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(window.location.origin+window.location.pathname+"?session="+qrFullscreen.id)}&bgcolor=0e0e14&color=e8e6e1&margin=20`}
+              alt="QR Code"
+              style={{width:"min(80vw,80vh)",height:"min(80vw,80vh)",borderRadius:12,border:`2px solid ${C.purple}66`}}
+            />
+            <div style={{display:"flex",gap:12}}>
+              <button onClick={e=>{e.stopPropagation();downloadQR(qrFullscreen);}} style={{background:C.purple,color:"#fff",border:"none",borderRadius:4,padding:"10px 22px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14}}>⬇ Télécharger</button>
+              <button onClick={()=>setQrFullscreen(null)} style={{background:C.card2,color:C.muted,border:`1px solid ${C.border2}`,borderRadius:4,padding:"10px 22px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14}}>✕ Fermer</button>
+            </div>
+            <div style={{color:C.muted,fontSize:12}}>Cliquer en dehors pour fermer</div>
+          </div>
+        )}
       </Wrap>
     );
   }
 
   // ── PAGE SESSION PUBLIQUE (QR code, sans compte) ────────────
   if(page==="pub-session"){
-    const startPubExam=()=>{
+    const startPubExam=async()=>{
       if(!pubName.trim()||!pubSession) return;
       const catIds=pubSession.cat_ids||[];
-      const pool=qs.filter(q=>catIds.length===0||catIds.includes(q.catId));
+      // Questions communes filtrées par catégorie
+      const commonPool=qs.filter(q=>catIds.length===0||catIds.includes(q.catId));
+      // Questions spécifiques à cette session (créées par le formateur)
+      const {data:sqData} = await sb.from("pending_questions").select("*").eq("session_id",pubSession.id);
+      const sessionPool=(sqData||[]).map(q=>({id:q.id,text:q.text,opts:q.options,correct:q.correct_index,expl:q.explanation||"",catId:null}));
+      // Mélanger les deux pools
+      const pool=[...commonPool,...sessionPool];
       if(!pool.length){ alert("Aucune question disponible pour cette session."); return; }
       const shuffled=pool.sort(()=>Math.random()-0.5).slice(0,pubSession.max_questions||20).map(q=>{
         const idxs=[0,1,2,3].sort(()=>Math.random()-0.5);
