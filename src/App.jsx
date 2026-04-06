@@ -1400,7 +1400,7 @@ export default function App() {
             </span>
             {myResults.length>0&&<Btn onClick={()=>setPage("history")} ghost sm>📊 Mon bilan</Btn>}
             <Btn onClick={()=>{setResCat("all");setPage("resources");}} ghost sm>📚 Ressources</Btn>
-            {isFormateur&&!isAdmin&&<Btn onClick={()=>{setFTab("sessions");setPage("formateur");}} sm color={C.purple}>📚 Formateur</Btn>}
+            {(isFormateur||isAdmin)&&<Btn onClick={()=>{setFTab("sessions");loadMySessions();setPage("formateur");}} sm color={C.purple}>📚 Formateur</Btn>}
             {isAdmin&&<Btn onClick={()=>{setAdminTab("qs");setPage("admin");}} sm color={C.red}>⚙ Admin</Btn>}
             <button onClick={doLogout} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",padding:"4px 8px"}} onMouseEnter={e=>e.currentTarget.style.color=C.text2} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>Déco.</button>
           </>}
