@@ -303,22 +303,50 @@ const Field = ({value,onChange,placeholder,type="text",rows,onKeyDown,autoFocus,
 const Btn = ({onClick,children,color=C.red,disabled,full,ghost,sm,danger}) => {
   const bg=danger?"#3a0e0a":ghost?"transparent":disabled?"#16161c":color;
   const col=danger?C.red:ghost?C.muted:disabled?"#40404a":(color===C.greenL||color===C.green?"#000":"#fff");
-  return <button onClick={onClick} disabled={disabled} style={{width:full?"100%":undefined,background:bg,color:col,border:ghost?`1px solid ${C.border2}`:danger?`1px solid #5a1e18`:"none",borderRadius:4,padding:sm?"5px 14px":"11px 24px",cursor:disabled?"default":"pointer",fontWeight:700,fontSize:sm?12:14,fontFamily:"'Barlow',sans-serif",transition:"all 0.15s",boxShadow:(!ghost&&!disabled&&!danger)?`0 2px 12px ${color}33`:"none",display:"inline-flex",alignItems:"center",gap:6}}>{children}</button>;
+  return <button onClick={onClick} disabled={disabled} style={{width:full?"100%":undefined,background:bg,color:col,border:ghost?`1px solid ${C.border2}`:danger?`1px solid #5a1e18`:"none",borderRadius:4,padding:sm?"6px 14px":"11px 24px",cursor:disabled?"default":"pointer",fontWeight:700,fontSize:sm?12:14,fontFamily:"'Barlow',sans-serif",transition:"all 0.15s",boxShadow:(!ghost&&!disabled&&!danger)?`0 2px 12px ${color}33`:"none",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,minHeight:sm?36:44,touchAction:"manipulation"}}>{children}</button>;
 };
 const ScorePill = ({pct,lg}) => {
   const col=pct2col(pct);
   return <span style={{fontSize:lg?26:13,padding:lg?"8px 18px":"3px 10px",color:col,border:`1px solid ${col}44`,borderRadius:4,fontFamily:"Oswald,sans-serif",fontWeight:700,background:col+"14"}}>{pct}%</span>;
 };
 const Topbar = ({title,back,right}) => (
-  <div style={{background:C.surf+"ee",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
-    <div style={{display:"flex",alignItems:"center",gap:12}}>
-      {back&&<button onClick={back} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:18,padding:"4px 8px 4px 0"}} onMouseEnter={e=>e.currentTarget.style.color=C.text} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>←</button>}
-      <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:3,textTransform:"uppercase"}}>{title}</span>
+  <div style={{background:C.surf+"ee",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",height:52,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0,flex:1}}>
+      {back&&<button onClick={back} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:18,padding:"4px 8px 4px 0",flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.color=C.text} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>←</button>}
+      <span style={{fontFamily:"Oswald,sans-serif",fontSize:12,letterSpacing:2,textTransform:"uppercase",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{title}</span>
     </div>
-    <div style={{display:"flex",alignItems:"center",gap:8}}>{right}</div>
+    {right&&<div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>{right}</div>}
   </div>
 );
-const Wrap = ({children}) => <div style={{fontFamily:"'Barlow',sans-serif",background:C.bg,minHeight:"100vh",color:C.text}}>{children}</div>;
+const Wrap = ({children}) => (
+  <div style={{fontFamily:"'Barlow',sans-serif",background:C.bg,minHeight:"100vh",color:C.text}}>
+    <style>{`
+      *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+      html,body{margin:0;padding:0;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+      input,textarea,select,button{font-family:'Barlow',sans-serif;font-size:16px;}
+      input,textarea,select{font-size:16px!important;} /* empêche le zoom iOS */
+      ::-webkit-scrollbar{width:4px;height:4px;}
+      ::-webkit-scrollbar-track{background:transparent;}
+      ::-webkit-scrollbar-thumb{background:#2a2a36;border-radius:99px;}
+      button{touch-action:manipulation;}
+      /* Desktop : cache hamburger */
+      @media(min-width:641px){
+        .hamburger-btn{display:none!important;}
+        .mobile-only{display:none!important;}
+      }
+      /* Mobile : cache desktop nav */
+      @media(max-width:640px){
+        .desktop-nav{display:none!important;}
+        .desktop-only{display:none!important;}
+        /* Agrandir les zones tactiles */
+        button{min-height:40px;}
+        /* Réduire les titres admin */
+        .admin-tab-label{font-size:11px!important;}
+      }
+    `}</style>
+    {children}
+  </div>
+);
 const ErrBox = ({msg}) => msg?<div style={{color:"#fca5a5",fontSize:13,background:"rgba(220,38,38,0.08)",border:"1px solid rgba(220,38,38,0.25)",borderRadius:4,padding:"10px 14px",marginBottom:12,lineHeight:1.5}}>{msg}</div>:null;
 const OkBox  = ({msg}) => msg?<div style={{color:"#86efac",fontSize:13,background:"rgba(22,163,74,0.08)",border:"1px solid rgba(22,163,74,0.25)",borderRadius:4,padding:"10px 14px",marginBottom:12}}>{msg}</div>:null;
 const StatCard = ({label,value,color=C.text}) => (
@@ -589,7 +617,7 @@ function GradeUpModal({grade, pseudo, onClose}) {
           background:`linear-gradient(160deg,#0e0e16,#1a1020)`,
           border:`2px solid ${grade.color}66`,
           borderRadius:12,
-          padding:"40px 36px",
+          padding:"clamp(24px,5vw,40px) clamp(16px,4vw,36px)",
           maxWidth:560, width:"100%",
           textAlign:"center",
           boxShadow:`0 0 80px ${grade.color}44, 0 0 0 1px ${grade.color}22`,
@@ -692,7 +720,7 @@ function BadgesUnlockModal({badges, onClose}) {
           background:"linear-gradient(160deg,#0e0e16,#161020)",
           border:`1px solid ${C.yellowL}44`,
           borderRadius:10,
-          padding:"32px 28px",
+          padding:"clamp(20px,4vw,32px) clamp(16px,4vw,28px)",
           maxWidth:480, width:"100%",
           textAlign:"center",
           boxShadow:`0 0 60px ${C.yellowL}22`,
@@ -836,6 +864,7 @@ export default function App() {
   const [isAdmin,setIsAdmin]     = useState(false);
   const [isFormateur,setIsFormateur] = useState(false);
   const [pseudo,setPseudo]       = useState("");
+  const [mobileMenu,setMobileMenu] = useState(false);
 
   const [cats,setCats]           = useState([]);
   const [qs,setQs]               = useState([]);
@@ -942,7 +971,13 @@ export default function App() {
   const [gradeUpModal,setGradeUpModal] = useState(null); // grade object
   const [badgeModal,setBadgeModal]     = useState(false);
 
-  // ── BOOT ─────────────────────────────────────────────────────
+  // Persister la page dans sessionStorage
+  useEffect(()=>{
+    const SAFE = ["home","history","resources","admin","formateur"];
+    if(SAFE.includes(page)) sessionStorage.setItem("sp_page",page);
+    if(page==="auth"||page==="boot") sessionStorage.removeItem("sp_page");
+    setMobileMenu(false); // fermer menu mobile à chaque changement de page
+  },[page]);
   useEffect(()=>{
     if(!document.querySelector("#gf-sp")){
       const l=document.createElement("link");l.id="gf-sp";l.rel="stylesheet";
@@ -1032,7 +1067,9 @@ export default function App() {
         setPseudo(prof.pseudo||u.email.split("@")[0]);
       } else setPseudo(u.email.split("@")[0]);
       await Promise.all([loadData(),loadMyResults(u.id)]);
-      setPage("home");
+      // Restaurer la dernière page si possible
+      const saved = sessionStorage.getItem("sp_page");
+      setPage(saved||"home");
     }catch(e){console.error(e);setPage("auth");}
   };
 
@@ -1425,14 +1462,14 @@ export default function App() {
   // ── AUTH ───────────────────────────────────────────────────
   if(page==="auth") return (
     <Wrap>
-      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse at 50% 0%, rgba(232,57,42,0.08) 0%, transparent 60%)`}}>
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:`radial-gradient(ellipse at 50% 0%, rgba(232,57,42,0.08) 0%, transparent 60%)`}}>
         <div style={{width:"100%",maxWidth:380}}>
           <div style={{textAlign:"center",marginBottom:40}}>
             <div style={{fontSize:56,marginBottom:20,filter:"drop-shadow(0 0 28px rgba(232,57,42,0.5))"}}>🔥</div>
             <h1 style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(24px,6vw,44px)",fontWeight:700,letterSpacing:5,textTransform:"uppercase",margin:"0 0 10px",color:C.text}}>SAPEURS-POMPIERS</h1>
             <div style={{fontFamily:"Oswald,sans-serif",color:C.red,letterSpacing:5,textTransform:"uppercase",fontSize:11}}>Plateforme QCM · Formation</div>
           </div>
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:"36px 32px",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:"clamp(20px,5vw,36px) clamp(16px,4vw,32px)",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
             <div style={{display:"flex",background:C.surf,borderRadius:6,padding:3,marginBottom:28}}>
               {[["login","Connexion"],["register","Inscription"]].map(([m,l])=>(
                 <button key={m} onClick={()=>{setAuthMode(m);setAErr("");}} style={{flex:1,background:authMode===m?C.red:"transparent",color:authMode===m?"#fff":C.muted,border:"none",borderRadius:4,padding:"10px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:13,transition:"all 0.2s"}}>{l}</button>
@@ -1459,8 +1496,8 @@ export default function App() {
     const accentColor=mode==="all"?C.red:mode==="revision"?C.orange:cat?.color||C.red;
     return (
       <Wrap>
-        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${accentColor}`,borderRadius:8,padding:"36px 32px",width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${accentColor}`,borderRadius:8,padding:"clamp(20px,5vw,36px) clamp(16px,4vw,32px)",width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
             <div style={{marginBottom:28}}>
               <div style={{fontFamily:"Oswald,sans-serif",fontSize:22,letterSpacing:2,textTransform:"uppercase",marginBottom:8,color:accentColor}}>
                 {mode==="all"?"📋 Examen Blanc":mode==="revision"?"🔄 Mode révision":cat?.name}
@@ -1519,26 +1556,52 @@ export default function App() {
     const badges=getUnlocked(myResults,cats);
     return (
       <Wrap>
-        <Topbar
-          title={<><span style={{fontSize:16,marginRight:8}}>🔥</span>Sapeurs-Pompiers QCM</>}
-          right={<>
-            <span style={{color:C.muted,fontSize:13,display:"flex",alignItems:"center",gap:6}}>
-              <span style={{background:C.faint,width:26,height:26,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:11}}>👤</span>
-              <strong style={{color:C.text}}>{pseudo}</strong>
+        {/* ── TOPBAR HOME ── */}
+        <div style={{background:C.surf+"ee",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",height:52,position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
+            <span style={{fontSize:18}}>🔥</span>
+            <span style={{fontFamily:"Oswald,sans-serif",fontSize:12,letterSpacing:2,textTransform:"uppercase",color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>SPV QCM</span>
+          </div>
+          {/* Desktop nav */}
+          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}} className="desktop-nav">
+            <span style={{color:C.muted,fontSize:12,display:"flex",alignItems:"center",gap:5}}>
+              <span style={{background:C.faint,width:22,height:22,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:10}}>👤</span>
+              <strong style={{color:C.text2,fontSize:12}}>{pseudo}</strong>
             </span>
-            {myResults.length>0&&<Btn onClick={()=>setPage("history")} ghost sm>📊 Mon bilan</Btn>}
+            {myResults.length>0&&<Btn onClick={()=>setPage("history")} ghost sm>📊 Bilan</Btn>}
             <Btn onClick={()=>{setResCat("all");setPage("resources");}} ghost sm>📚 Ressources</Btn>
             {isAdmin&&<Btn onClick={()=>{setAdminTab("qs");setPage("admin");}} sm color={C.red}>⚙ Admin</Btn>}
             {(isFormateur||isAdmin)&&<Btn onClick={()=>{setFTab("sessions");loadMySessions();setPage("formateur");}} sm color={C.purple}>📚 Formateur</Btn>}
-            <button onClick={doLogout} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",padding:"4px 8px"}} onMouseEnter={e=>e.currentTarget.style.color=C.text2} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>Déco.</button>
-          </>}
-        />
-        <div style={{background:`linear-gradient(150deg, rgba(232,57,42,0.12) 0%, rgba(6,6,10,0) 45%)`,borderBottom:`1px solid ${C.border}`,padding:"52px 24px 44px"}}>
+            <button onClick={doLogout} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",padding:"4px 6px"}} onMouseEnter={e=>e.currentTarget.style.color=C.text} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>Déco.</button>
+          </div>
+          {/* Mobile hamburger — caché sur desktop */}
+          <button className="hamburger-btn" onClick={()=>setMobileMenu(m=>!m)} style={{background:"none",border:"none",cursor:"pointer",padding:"8px",display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
+            <span style={{display:"block",width:22,height:2,background:C.text,borderRadius:2,transition:"all 0.25s",transform:mobileMenu?"rotate(45deg) translate(5px,5px)":"none"}}/>
+            <span style={{display:"block",width:22,height:2,background:C.text,borderRadius:2,transition:"all 0.25s",opacity:mobileMenu?0:1,transform:mobileMenu?"scaleX(0)":"none"}}/>
+            <span style={{display:"block",width:22,height:2,background:C.text,borderRadius:2,transition:"all 0.25s",transform:mobileMenu?"rotate(-45deg) translate(5px,-5px)":"none"}}/>
+          </button>
+        </div>
+
+        {/* Menu mobile déroulant */}
+        {mobileMenu&&(
+          <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"8px 16px",display:"flex",flexDirection:"column",gap:2,zIndex:99,position:"relative"}}>
+            <div style={{color:C.muted,fontSize:12,padding:"8px 12px",borderBottom:`1px solid ${C.border}`,marginBottom:4,display:"flex",alignItems:"center",gap:6}}>
+              <span>👤</span><strong style={{color:C.text}}>{pseudo}</strong>
+            </div>
+            {myResults.length>0&&<button onClick={()=>setPage("history")} style={{background:"none",border:"none",color:C.text,cursor:"pointer",textAlign:"left",padding:"11px 12px",fontSize:14,fontFamily:"'Barlow',sans-serif",fontWeight:600,borderRadius:4}} onMouseEnter={e=>e.currentTarget.style.background=C.card} onMouseLeave={e=>e.currentTarget.style.background="none"}>📊 Mon bilan</button>}
+            <button onClick={()=>{setResCat("all");setPage("resources");}} style={{background:"none",border:"none",color:C.text,cursor:"pointer",textAlign:"left",padding:"11px 12px",fontSize:14,fontFamily:"'Barlow',sans-serif",fontWeight:600,borderRadius:4}} onMouseEnter={e=>e.currentTarget.style.background=C.card} onMouseLeave={e=>e.currentTarget.style.background="none"}>📚 Ressources</button>
+            {isAdmin&&<button onClick={()=>{setAdminTab("qs");setPage("admin");}} style={{background:C.red+"18",border:"none",color:C.red,cursor:"pointer",textAlign:"left",padding:"11px 12px",fontSize:14,fontFamily:"'Barlow',sans-serif",fontWeight:700,borderRadius:4}}>⚙ Administration</button>}
+            {(isFormateur||isAdmin)&&<button onClick={()=>{setFTab("sessions");loadMySessions();setPage("formateur");}} style={{background:C.purple+"18",border:"none",color:C.purpleL,cursor:"pointer",textAlign:"left",padding:"11px 12px",fontSize:14,fontFamily:"'Barlow',sans-serif",fontWeight:700,borderRadius:4}}>📚 Espace Formateur</button>}
+            <button onClick={doLogout} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",textAlign:"left",padding:"11px 12px",fontSize:13,fontFamily:"'Barlow',sans-serif",borderRadius:4,marginTop:4,borderTop:`1px solid ${C.border}`}}>Se déconnecter</button>
+          </div>
+        )}
+
+        <div style={{background:`linear-gradient(150deg, rgba(232,57,42,0.12) 0%, rgba(6,6,10,0) 45%)`,borderBottom:`1px solid ${C.border}`,padding:"36px 16px 32px"}}>
           <div style={{maxWidth:700,margin:"0 auto",textAlign:"center"}}>
-            <h1 style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(24px,5vw,48px)",fontWeight:700,letterSpacing:3,textTransform:"uppercase",margin:"0 0 12px"}}>Bonjour, {pseudo} 👋</h1>
-            <p style={{color:C.text2,fontSize:15,fontWeight:300,maxWidth:420,margin:"0 auto",lineHeight:1.8}}>Testez et renforcez vos connaissances.</p>
+            <h1 style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(20px,5vw,44px)",fontWeight:700,letterSpacing:2,textTransform:"uppercase",margin:"0 0 10px"}}>Bonjour, {pseudo} 👋</h1>
+            <p style={{color:C.text2,fontSize:14,fontWeight:300,maxWidth:380,margin:"0 auto",lineHeight:1.7}}>Testez et renforcez vos connaissances.</p>
             {stats.total>0&&(
-              <div style={{display:"inline-flex",alignItems:"center",gap:20,marginTop:24,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 24px"}}>
+              <div style={{display:"inline-flex",alignItems:"center",gap:14,marginTop:20,background:C.card,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 18px",flexWrap:"wrap",justifyContent:"center"}}>
                 <div style={{textAlign:"center"}}><div style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700}}>{stats.total}</div><div style={{color:C.muted,fontSize:11}}>examens</div></div>
                 <div style={{width:1,height:30,background:C.border}}/>
                 <div style={{textAlign:"center"}}><div style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700,color:pct2col(stats.avg)}}>{stats.avg}%</div><div style={{color:C.muted,fontSize:11}}>moyenne</div></div>
@@ -1549,9 +1612,9 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{maxWidth:960,margin:"0 auto",padding:"40px 24px"}}>
+        <div style={{maxWidth:960,margin:"0 auto",padding:"24px 16px"}}>
           {/* Modes spéciaux */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12,marginBottom:36}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(180px,100%),1fr))",gap:12,marginBottom:36}}>
             <div onClick={()=>openPreExam(null,"all")} style={{background:`linear-gradient(135deg, rgba(232,57,42,0.15), rgba(232,57,42,0.05))`,border:`1px solid ${C.red}44`,borderRadius:6,padding:"18px 20px",cursor:"pointer",transition:"all 0.2s",display:"flex",alignItems:"center",gap:14}} onMouseEnter={e=>{e.currentTarget.style.borderColor=C.red;e.currentTarget.style.transform="translateY(-2px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=C.red+"44";e.currentTarget.style.transform="none";}}>
               <span style={{fontSize:28}}>📋</span>
               <div>
@@ -1578,7 +1641,7 @@ export default function App() {
           {cats.length===0?(
             <div style={{textAlign:"center",color:C.muted,padding:"80px 0"}}><div style={{fontSize:44,marginBottom:14}}>📋</div>{isAdmin?"Aucune catégorie — créez-en une dans l'admin.":"Aucune catégorie disponible."}</div>
           ):(
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14,marginBottom:44}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(260px,100%),1fr))",gap:14,marginBottom:44}}>
               {cats.map(cat=>{
                 const count=qs.filter(q=>q.catId===cat.id).length;
                 const catRes=myResults.filter(r=>r.cat_id===cat.id);
@@ -1650,7 +1713,7 @@ export default function App() {
                   <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Grades</span>
                   <span style={{color:C.muted,fontSize:12}}>{grades.filter(b=>unlockedIds.has(b.id)).length}/{grades.length}</span>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:8,marginBottom:32}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(80px,28%),1fr))",gap:8,marginBottom:32}}>
                   {grades.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
                 </div>
 
@@ -1674,7 +1737,7 @@ export default function App() {
                       <div style={{background:C.border,borderRadius:99,height:3,marginBottom:10,overflow:"hidden"}}>
                         <div style={{height:"100%",width:`${fam.length?nU/fam.length*100:0}%`,background:meta.color,borderRadius:99,transition:"width 0.5s"}}/>
                       </div>
-                      <div style={{display:"grid",gridTemplateColumns:`repeat(${fam.length},1fr)`,gap:6}}>
+                      <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(min(72px,${100/fam.length}%),1fr))`,gap:5}}>
                         {fam.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
                       </div>
                     </div>
@@ -1690,7 +1753,7 @@ export default function App() {
                         <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:4,textTransform:"uppercase",color:C.muted}}>Badges spéciaux</span>
                         <span style={{color:C.muted,fontSize:12}}>{sp.filter(b=>unlockedIds.has(b.id)).length}/{sp.length}</span>
                       </div>
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(88px,1fr))",gap:8}}>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(80px,28%),1fr))",gap:8}}>
                         {sp.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
                       </div>
                     </div>
@@ -1753,13 +1816,13 @@ export default function App() {
     return (
       <Wrap>
         <Topbar title="📚 Ressources documentaires" back={()=>setPage("home")} right={<span style={{color:C.muted,fontSize:13}}>👤 {pseudo}</span>}/>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"12px 24px",display:"flex",gap:8,flexWrap:"wrap"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"10px 16px",display:"flex",gap:6,flexWrap:"wrap"}}>
           <button onClick={()=>setResCat("all")} style={{background:resCat==="all"?C.text:"transparent",color:resCat==="all"?C.bg:C.muted,border:`1px solid ${resCat==="all"?C.text:C.border2}`,borderRadius:20,padding:"5px 16px",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif",fontWeight:700,transition:"all 0.15s"}}>Toutes</button>
           {cats.map(cat=>(
             <button key={cat.id} onClick={()=>setResCat(cat.id)} style={{background:resCat===cat.id?cat.color:"transparent",color:resCat===cat.id?"#fff":C.muted,border:`1px solid ${resCat===cat.id?cat.color:C.border2}`,borderRadius:20,padding:"5px 16px",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif",fontWeight:600,transition:"all 0.15s"}}>{cat.name}</button>
           ))}
         </div>
-        <div style={{maxWidth:960,margin:"0 auto",padding:"40px 24px"}}>
+        <div style={{maxWidth:960,margin:"0 auto",padding:"24px 16px"}}>
           {filtered.length===0?(
             <div style={{textAlign:"center",color:C.muted,padding:"80px 0"}}><div style={{fontSize:44,marginBottom:14}}>📂</div>{isAdmin?"Ajoutez des documents depuis l'admin.":"Aucun document disponible."}</div>
           ):(
@@ -1774,7 +1837,7 @@ export default function App() {
                     <div style={{flex:1,height:1,background:C.border}}/>
                     <span style={{color:C.muted,fontSize:12}}>{typeDocs.length}</span>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(260px,100%),1fr))",gap:14}}>
                     {typeDocs.map(doc=>{
                       const cat=cats.find(c=>c.id===doc.catId);
                       const isPdf=doc.url?.toLowerCase().includes(".pdf");
@@ -1811,7 +1874,7 @@ export default function App() {
     return (
       <Wrap>
         <Topbar title="📊 Mon bilan" back={()=>setPage("home")} right={<span style={{color:C.muted,fontSize:13}}>👤 {pseudo}</span>}/>
-        <div style={{maxWidth:820,margin:"0 auto",padding:"40px 24px"}}>
+        <div style={{maxWidth:820,margin:"0 auto",padding:"24px 16px"}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,marginBottom:12}}>
             <StatCard label="Examens complétés"  value={stats.total}      color={C.blueL}/>
             <StatCard label="Score moyen général" value={`${stats.avg}%`} color={pct2col(stats.avg)}/>
@@ -1943,11 +2006,11 @@ export default function App() {
                   </div>
                 )}
                 <div style={{fontFamily:"Oswald,sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:10}}>Grades ({grades.filter(b=>unlockedIds.has(b.id)).length}/{grades.length})</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(85px,1fr))",gap:7,marginBottom:20}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(78px,28%),1fr))",gap:7,marginBottom:20}}>
                   {grades.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)} stats={stats}/>)}
                 </div>
                 <div style={{fontFamily:"Oswald,sans-serif",fontSize:10,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:10}}>Badges spéciaux ({thematic.filter(b=>unlockedIds.has(b.id)).length}/{thematic.length})</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(85px,1fr))",gap:7}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(78px,28%),1fr))",gap:7}}>
                   {thematic.map(b=><BadgeCard key={b.id} badge={b} unlocked={unlockedIds.has(b.id)}/>)}
                 </div>
               </div>
@@ -1956,7 +2019,7 @@ export default function App() {
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:16}}>Historique détaillé</div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             {myResults.map(r=>(
-              <div key={r.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div key={r.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <div style={{width:8,height:8,borderRadius:"50%",background:r.color||C.red,flexShrink:0}}/>
                   <div><div style={{fontSize:13,fontWeight:600}}>{r.cat_name}</div><div style={{color:C.muted,fontSize:11}}>{fmtDate(r.created_at)}</div></div>
@@ -2006,7 +2069,7 @@ export default function App() {
         )}
 
         {/* Header exam */}
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:52,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"0 16px",height:48,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:8,height:8,borderRadius:"50%",background:examMode==="all"?C.red:examMode==="revision"?C.orange:examCat?.color||C.purple}}/>
             <span style={{color:C.text2,fontSize:13,fontFamily:"Oswald,sans-serif",letterSpacing:1}}>
@@ -2029,7 +2092,7 @@ export default function App() {
 
         {/* ── BARRE DE PROGRESSION EN TEMPS RÉEL ── */}
         {doneCount>0&&(
-          <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"10px 24px",display:"flex",alignItems:"center",gap:16}}>
+          <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"8px 16px",display:"flex",alignItems:"center",gap:12}}>
             {/* Barre visuelle */}
             <div style={{flex:1,background:C.bg,borderRadius:99,height:8,overflow:"hidden",position:"relative"}}>
               {/* Bonnes réponses (vert) */}
@@ -2053,8 +2116,8 @@ export default function App() {
           </div>
         )}
 
-        <div style={{maxWidth:680,margin:"0 auto",padding:"36px 24px"}}>
-          <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(18px,3vw,24px)",fontWeight:500,lineHeight:1.55,marginBottom:32}}>{q.text}</div>
+        <div style={{maxWidth:680,margin:"0 auto",padding:"24px 16px"}}>
+          <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(18px,3vw,24px)",fontWeight:500,lineHeight:1.5,marginBottom:20}}>{q.text}</div>
 
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
             {q.opts.map((opt,i)=>{
@@ -2066,7 +2129,7 @@ export default function App() {
               }
               return (
                 <div key={i} onClick={()=>!shown&&setPicked(i)}
-                  style={{background:bg,border:brd,borderRadius:6,padding:"14px 18px",cursor:shown?"default":"pointer",display:"flex",alignItems:"center",gap:14,color:clr,transition:"all 0.15s",boxShadow:shadow2}}>
+                  style={{background:bg,border:brd,borderRadius:6,padding:"12px 14px",cursor:shown?"default":"pointer",display:"flex",alignItems:"center",gap:12,color:clr,transition:"all 0.15s",boxShadow:shadow2}}>
                   <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,fontWeight:700,minWidth:24,color:shown&&i===q.correct?C.greenL:shown&&i===picked&&i!==q.correct?C.red:"#404050"}}>{LABELS[i]}</span>
                   <span style={{fontSize:15,flex:1,lineHeight:1.5}}>{opt}</span>
                   {shown&&i===q.correct&&<span style={{color:C.greenL,fontWeight:700,fontSize:16}}>✓</span>}
@@ -2112,7 +2175,7 @@ export default function App() {
         {!gradeUpModal&&badgeModal&&nonGradeNewBadges.length>0&&(
           <BadgesUnlockModal badges={nonGradeNewBadges} onClose={()=>setBadgeModal(false)}/>
         )}
-        <div style={{maxWidth:680,margin:"0 auto",padding:"52px 24px",textAlign:"center"}}>
+        <div style={{maxWidth:680,margin:"0 auto",padding:"32px 16px",textAlign:"center"}}>
           <div style={{fontSize:56,marginBottom:14}}>{emoji}</div>
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(56px,14vw,96px)",fontWeight:700,color:pct2col(pct),lineHeight:1}}>{pct}%</div>
           <div style={{color:C.text2,fontSize:17,marginTop:10}}>{sc} / {total} bonnes réponses</div>
@@ -2142,7 +2205,7 @@ export default function App() {
               const ok=log[i]?.correct;
               const cat=cats.find(c=>c.id===q.catId);
               return (
-                <div key={q.id} style={{display:"flex",gap:12,padding:"12px 0",borderBottom:`1px solid ${C.border}`}}>
+                <div key={q.id} style={{display:"flex",gap:10,padding:"10px 0",borderBottom:`1px solid ${C.border}`}}>
                   <span style={{color:ok?C.greenL:C.red,flexShrink:0,fontWeight:700,marginTop:2,fontSize:16}}>{ok?"✓":"✗"}</span>
                   <div style={{flex:1}}>
                     <div style={{fontSize:13,color:ok?C.text:C.text2,lineHeight:1.5}}>{q.text}</div>
@@ -2176,7 +2239,7 @@ export default function App() {
 
     return (
       <Wrap>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",height:52}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:16}}>🔥</span>
             <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:3,textTransform:"uppercase"}}>Administration</span>
@@ -2184,14 +2247,16 @@ export default function App() {
           </div>
           <button onClick={()=>setPage("home")} style={{background:"transparent",color:C.muted,border:"none",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif"}} onMouseEnter={e=>e.currentTarget.style.color=C.text2} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>← Retour au site</button>
         </div>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",padding:"0 20px",overflowX:"auto"}}>
-          {[["qs","📋 Questions"],["cats","🗂 Catégories"],["documents","📚 Documents"],["classement","🏆 Classement"],["pending","⏳ En attente"],["settings","⚙ Paramètres"]].map(([k,l])=>(
-            <button key={k} onClick={()=>enterTab(k)} style={{background:"none",border:"none",borderBottom:`2px solid ${adminTab===k?C.red:"transparent"}`,color:adminTab===k?C.text:C.muted,padding:"14px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14,whiteSpace:"nowrap",transition:"all 0.15s"}}>
-              {l}{k==="pending"&&pendingQs.filter(q=>q.status==="pending").length>0&&<span style={{background:C.orange,color:"#000",fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:20,marginLeft:5}}>{pendingQs.filter(q=>q.status==="pending").length}</span>}
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",padding:"0 12px",overflowX:"auto"}}>
+          {[["qs","📋","Questions"],["cats","🗂","Catégories"],["documents","📚","Docs"],["classement","🏆","Classement"],["pending","⏳","En attente"],["settings","⚙","Paramètres"]].map(([k,icon,l])=>(
+            <button key={k} onClick={()=>enterTab(k)} style={{background:"none",border:"none",borderBottom:`2px solid ${adminTab===k?C.red:"transparent"}`,color:adminTab===k?C.text:C.muted,padding:"12px 12px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:13,whiteSpace:"nowrap",transition:"all 0.15s",display:"flex",alignItems:"center",gap:5}}>
+              <span>{icon}</span>
+              <span className="admin-tab-label">{l}</span>
+              {k==="pending"&&pendingQs.filter(q=>q.status==="pending").length>0&&<span style={{background:C.orange,color:"#000",fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:20,marginLeft:2}}>{pendingQs.filter(q=>q.status==="pending").length}</span>}
             </button>
           ))}
         </div>
-        <div style={{maxWidth:960,margin:"0 auto",padding:"32px 24px"}}>
+        <div style={{maxWidth:960,margin:"0 auto",padding:"20px 16px"}}>
 
           {adminTab==="qs"&&!editQ&&(()=>{
             // Filtrage + tri
@@ -2286,7 +2351,7 @@ export default function App() {
                   {filtered.map((q,idx)=>{
                     const cat=cats.find(c=>c.id===q.catId);
                     return (
-                      <div key={q.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,transition:"border-color 0.15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.border2} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+                      <div key={q.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16,transition:"border-color 0.15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=C.border2} onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
                         <div style={{display:"flex",alignItems:"center",gap:12,flex:1,minWidth:0}}>
                           <span style={{color:C.muted,fontSize:11,fontFamily:"Oswald,sans-serif",fontWeight:700,flexShrink:0,minWidth:24,textAlign:"right"}}>{idx+1}</span>
                           <div style={{flex:1,minWidth:0}}>
@@ -2352,7 +2417,7 @@ export default function App() {
                   const cat=cats.find(c=>c.id===doc.catId);
                   const dtype=DOC_TYPES.find(t=>t.key===doc.type);
                   return (
-                    <div key={doc.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"12px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16}}>
+                    <div key={doc.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:4,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",gap:8,marginBottom:4}}><span style={{fontSize:11,color:dtype?.color,fontWeight:600}}>{dtype?.icon} {dtype?.label}</span>{cat&&<span style={{fontSize:11,color:cat.color,fontWeight:600}}>· {cat.name}</span>}</div>
                         <div style={{fontSize:14,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{doc.title}</div>
@@ -2395,7 +2460,7 @@ export default function App() {
                   {leaderboard.map((entry,rank)=>{
                     const medal=rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":`#${rank+1}`;
                     return (
-                      <div key={entry.pseudo} style={{background:C.card,border:`1px solid ${rank===0?"#403818":C.border}`,borderRadius:4,padding:"13px 18px",display:"flex",alignItems:"center",gap:16}}>
+                      <div key={entry.pseudo} style={{background:C.card,border:`1px solid ${rank===0?"#403818":C.border}`,borderRadius:4,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                         <span style={{fontFamily:"Oswald,sans-serif",fontSize:rank<3?22:14,minWidth:32,textAlign:"center",color:C.muted}}>{medal}</span>
                         <div style={{flex:1}}>
                           <div style={{fontWeight:700,fontSize:15,marginBottom:6}}>{entry.pseudo}</div>
@@ -2447,7 +2512,7 @@ export default function App() {
                         <span style={{fontSize:11,color:pq.status==="pending"?C.orange:pq.status==="approved"?C.greenL:C.red,fontWeight:700}}>{pq.status==="pending"?"⏳ En attente":pq.status==="approved"?"✓ Approuvée":"✗ Rejetée"}</span>
                       </div>
                       <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>{pq.text}</div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(200px,100%),1fr))",gap:4}}>
                         {(pq.options||[]).map((opt,i)=>(
                           <div key={i} style={{fontSize:12,color:i===pq.correct_index?C.greenL:C.text2,background:i===pq.correct_index?"#081e1044":C.surf,border:`1px solid ${i===pq.correct_index?C.greenL+"44":C.border}`,borderRadius:3,padding:"4px 8px"}}>
                             <span style={{fontFamily:"Oswald,sans-serif",fontWeight:700,marginRight:6,color:i===pq.correct_index?C.greenL:"#404050"}}>{"ABCD"[i]}</span>{opt}
@@ -2485,7 +2550,7 @@ export default function App() {
           })()}
 
           {adminTab==="settings"&&(
-            <div style={{maxWidth:480}}>
+            <div style={{maxWidth:"min(480px,100%)"}}>
               <h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",marginBottom:28}}>Paramètres du compte</h2>
               <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:6,padding:24,marginBottom:14}}>
                 <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>Changer mon pseudo</div>
@@ -2515,7 +2580,7 @@ export default function App() {
 
         {delConfirm&&(
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:24,backdropFilter:"blur(4px)"}}>
-            <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:32,maxWidth:380,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.6)"}}>
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:"clamp(20px,5vw,32px)",maxWidth:380,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.6)"}}>
               <div style={{fontFamily:"Oswald,sans-serif",fontSize:18,marginBottom:10}}>Confirmer la suppression</div>
               <p style={{color:C.text2,fontSize:14,marginBottom:28,lineHeight:1.6}}>
                 {delConfirm.type==="cat"?"⚠ Supprimer cette catégorie supprimera aussi toutes ses questions et documents.":delConfirm.type==="doc"?"Ce document sera définitivement supprimé.":"Cette action est irréversible."}
@@ -2539,7 +2604,7 @@ export default function App() {
 
     return (
       <Wrap>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",height:52}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:16}}>📚</span>
             <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:3,textTransform:"uppercase"}}>Espace Formateur</span>
@@ -2547,7 +2612,7 @@ export default function App() {
           </div>
           <button onClick={()=>setPage("home")} style={{background:"transparent",color:C.muted,border:"none",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif"}}>← Retour au site</button>
         </div>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",padding:"0 20px",overflowX:"auto"}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",padding:"0 12px",overflowX:"auto"}}>
           {[["sessions","🔗 Mes sessions"],["questions","📝 Mes questions"]].map(([k,l])=>(
             <button key={k} onClick={()=>{setFTab(k);setEditSession(null);setEditPQ(null);setFErr(""); if(k==="sessions")loadMySessions(); if(k==="questions")loadMyPending();}}
               style={{background:"none",border:"none",borderBottom:`2px solid ${fTab===k?C.purple:"transparent"}`,color:fTab===k?C.text:C.muted,padding:"13px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14,whiteSpace:"nowrap"}}>
@@ -2555,7 +2620,7 @@ export default function App() {
             </button>
           ))}
         </div>
-        <div style={{maxWidth:900,margin:"0 auto",padding:"32px 24px"}}>
+        <div style={{maxWidth:900,margin:"0 auto",padding:"20px 16px"}}>
 
           {/* ── SESSIONS ── */}
           {fTab==="sessions"&&(
@@ -2626,7 +2691,7 @@ export default function App() {
                   const res=sessionResults[s.id];
                   return (
                     <div key={s.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:6,overflow:"hidden"}}>
-                      <div style={{padding:"16px 20px",display:"flex",gap:16,flexWrap:"wrap",alignItems:"flex-start"}}>
+                      <div style={{padding:"12px 14px",display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-start"}}>
                         {/* Info session */}
                         <div style={{flex:1,minWidth:200}}>
                           <div style={{fontFamily:"Oswald,sans-serif",fontSize:16,fontWeight:700,marginBottom:4}}>{s.title}</div>
@@ -2648,7 +2713,7 @@ export default function App() {
                         <div style={{textAlign:"center",flexShrink:0}}>
                           <img src={qrUrl(s.id)} alt="QR" style={{width:120,height:120,borderRadius:6,border:`1px solid ${C.border}`,cursor:"pointer"}} onClick={()=>setQrFullscreen(s)}/>
                           <div style={{color:C.muted,fontSize:10,marginTop:4}}>Scanner pour accéder</div>
-                          <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"center"}}>
+                          <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"center",flexWrap:"wrap"}}>
                             <button onClick={()=>downloadQR(s)} title="Télécharger le QR code" style={{background:C.purple+"22",border:`1px solid ${C.purple}44`,color:C.purpleL,borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>⬇ Télécharger</button>
                             <button onClick={()=>setQrFullscreen(s)} title="Afficher en plein écran" style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"4px 10px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>⛶ Agrandir</button>
                           </div>
@@ -2789,7 +2854,7 @@ export default function App() {
 
     return (
       <Wrap>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",height:52}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={()=>{setPage("formateur");setFTab("sessions");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:18,padding:0}}>←</button>
             <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,textTransform:"uppercase",color:C.purpleL}}>{currentSession.title}</span>
@@ -2801,8 +2866,8 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{maxWidth:960,margin:"0 auto",padding:"28px 24px"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+        <div style={{maxWidth:960,margin:"0 auto",padding:"20px 16px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(320px,100%),1fr))",gap:20}}>
 
             {/* ── COLONNE GAUCHE : Questions de la base ── */}
             <div>
@@ -2912,7 +2977,7 @@ export default function App() {
     const isEnded   = liveSession.live_status==="ended";
     return (
       <Wrap>
-        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56}}>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",height:52}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={closeLiveControl} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:18,padding:0}}>←</button>
             <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,textTransform:"uppercase"}}>⚡ Contrôle Live — {liveSession.title}</span>
@@ -2924,7 +2989,7 @@ export default function App() {
           </div>
         </div>
 
-        <div style={{maxWidth:800,margin:"0 auto",padding:"32px 24px"}}>
+        <div style={{maxWidth:800,margin:"0 auto",padding:"20px 16px"}}>
           {/* Actions de contrôle */}
           <div style={{display:"flex",gap:12,marginBottom:32,flexWrap:"wrap"}}>
             {isWaiting&&(
@@ -2961,7 +3026,7 @@ export default function App() {
                 <div style={{fontSize:12,marginTop:8}}>Partagez le QR code pour qu'ils rejoignent.</div>
               </div>
             ):(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(150px,45%),1fr))",gap:10}}>
                 {waitroom.map((p,i)=>(
                   <div key={p.id} style={{background:C.surf,border:`1px solid ${C.greenL}33`,borderRadius:4,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
                     <div style={{width:8,height:8,borderRadius:"50%",background:C.greenL,flexShrink:0,boxShadow:`0 0 6px ${C.greenL}`}}/>
@@ -3083,7 +3148,7 @@ export default function App() {
       const siteUrl = window.location.origin+window.location.pathname;
       return (
         <Wrap>
-          <div style={{maxWidth:520,margin:"0 auto",padding:"60px 24px",textAlign:"center"}}>
+          <div style={{maxWidth:520,margin:"0 auto",padding:"36px 16px",textAlign:"center"}}>
             <div style={{fontSize:50,marginBottom:12}}>{pct>=70?"🎉":"💪"}</div>
             <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(52px,14vw,80px)",fontWeight:700,color:pct2col(pct),lineHeight:1}}>{pct}%</div>
             <div style={{color:C.text2,fontSize:16,marginTop:8}}>{sc} / {tot} bonnes réponses</div>
@@ -3113,7 +3178,7 @@ export default function App() {
     if(pubPhase==="waiting"){
       return (
         <Wrap>
-          <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
             <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:"40px 32px",width:"100%",maxWidth:400,textAlign:"center"}}>
               <div style={{fontSize:44,marginBottom:16}}>⏳</div>
               <div style={{fontFamily:"Oswald,sans-serif",fontSize:18,fontWeight:700,marginBottom:8}}>Salle d'attente</div>
@@ -3148,7 +3213,7 @@ export default function App() {
         <Wrap>
           <div style={{height:4,background:C.border}}><div style={{height:"100%",background:C.purple,width:`${(pubIdx/pubExamList.length)*100}%`,transition:"width 0.4s"}}/></div>
           {timerMinutes>0&&<div style={{height:3,background:C.border}}><div style={{height:"100%",background:timerCol,width:`${timerPct}%`,transition:"width 1s linear"}}/></div>}
-          <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"0 16px",height:48,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,color:C.purple}}>{pubSession?.title}</span>
             <div style={{display:"flex",alignItems:"center",gap:14}}>
               {timerMinutes>0&&pubTimerLeft!==null&&<span style={{fontFamily:"Oswald,sans-serif",fontSize:14,fontWeight:700,color:timerCol}}>{fmtTimer(pubTimerLeft)}</span>}
@@ -3156,7 +3221,7 @@ export default function App() {
             </div>
           </div>
           {pubLog.length>0&&(
-            <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"8px 24px",display:"flex",alignItems:"center",gap:14}}>
+            <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"6px 16px",display:"flex",alignItems:"center",gap:10}}>
               <div style={{flex:1,background:C.bg,borderRadius:99,height:7,overflow:"hidden",position:"relative"}}>
                 <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${(pubLog.filter(x=>x.correct).length/pubExamList.length)*100}%`,background:C.greenL,borderRadius:99,transition:"width 0.4s"}}/>
                 <div style={{position:"absolute",left:`${(pubLog.filter(x=>x.correct).length/pubExamList.length)*100}%`,top:0,height:"100%",width:`${((pubLog.length-pubLog.filter(x=>x.correct).length)/pubExamList.length)*100}%`,background:C.red,borderRadius:99,transition:"width 0.4s"}}/>
@@ -3164,15 +3229,15 @@ export default function App() {
               <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,color:pct2col(Math.round(pubLog.filter(x=>x.correct).length/pubLog.length*100)),fontWeight:700}}>{pubLog.filter(x=>x.correct).length}/{pubLog.length}</span>
             </div>
           )}
-          <div style={{maxWidth:660,margin:"0 auto",padding:"36px 24px"}}>
-            <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(17px,3vw,22px)",fontWeight:500,lineHeight:1.55,marginBottom:32}}>{q.text}</div>
+          <div style={{maxWidth:660,margin:"0 auto",padding:"20px 16px"}}>
+            <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(17px,3vw,22px)",fontWeight:500,lineHeight:1.5,marginBottom:20}}>{q.text}</div>
             <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
               {q.opts.map((opt,i)=>{
                 let bg=C.card,brd=`1px solid ${C.border}`,clr=C.text;
                 if(!pubShown&&pubPicked===i){bg="#14162e";brd=`1px solid ${C.purple}`;}
                 if(pubShown){if(i===q.correct){bg="#0a2014";brd=`1px solid ${C.greenL}`;clr=C.greenL;}else if(i===pubPicked&&i!==q.correct){bg="#1e0808";brd=`1px solid ${C.red}`;}}
                 return (
-                  <div key={i} onClick={()=>!pubShown&&setPubPicked(i)} style={{background:bg,border:brd,borderRadius:6,padding:"14px 18px",cursor:pubShown?"default":"pointer",display:"flex",alignItems:"center",gap:14,color:clr,transition:"all 0.12s"}}>
+                  <div key={i} onClick={()=>!pubShown&&setPubPicked(i)} style={{background:bg,border:brd,borderRadius:6,padding:"12px 14px",cursor:pubShown?"default":"pointer",display:"flex",alignItems:"center",gap:12,color:clr,transition:"all 0.12s"}}>
                     <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,fontWeight:700,minWidth:22,color:pubShown&&i===q.correct?C.greenL:pubShown&&i===pubPicked&&i!==q.correct?C.red:"#404050"}}>{LABELS[i]}</span>
                     <span style={{fontSize:15,flex:1,lineHeight:1.5}}>{opt}</span>
                     {pubShown&&i===q.correct&&<span style={{color:C.greenL,fontWeight:700}}>✓</span>}
@@ -3191,8 +3256,8 @@ export default function App() {
     // ── ENTRY ──
     return (
       <Wrap>
-        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.1) 0%, transparent 60%)`}}>
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.purple}`,borderRadius:8,padding:"36px 30px",width:"100%",maxWidth:380,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:16,background:`radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.1) 0%, transparent 60%)`}}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.purple}`,borderRadius:8,padding:"clamp(20px,5vw,36px) clamp(16px,4vw,30px)",width:"100%",maxWidth:380,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
             <div style={{fontSize:48,marginBottom:14,filter:"drop-shadow(0 0 20px rgba(124,58,237,0.5))"}}>{isLive?"⚡":"📋"}</div>
             <div style={{fontFamily:"Oswald,sans-serif",fontSize:20,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.text,marginBottom:6}}>{pubSession?.title}</div>
             {pubSession?.description&&<div style={{color:C.muted,fontSize:13,marginBottom:14,lineHeight:1.6}}>{pubSession.description}</div>}
