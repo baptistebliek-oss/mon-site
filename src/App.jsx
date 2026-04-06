@@ -114,83 +114,115 @@ const BADGES = [
   { id:"g15", icon:"💫💫", name:"Contrôleur général",     grade:true, desc:"6 000 examens · moy. ≥ 95% · 100 000 bonnes rép. · 500 parfaits",                          color:"#eab308", check:(s)=>s.total>=6000&&s.avg>=95&&s.correct>=100000&&s.perfects>=500 },
   { id:"g16", icon:"💎",  name:"Contrôleur gén. d'État",  grade:true, desc:"10 000 examens · moy. ≥ 98% · 150 000 bonnes rép. · 1 000 parfaits",                       color:"#e8392a", check:(s)=>s.total>=10000&&s.avg>=98&&s.correct>=150000&&s.perfects>=1000 },
 
-  // ── BONNES RÉPONSES — 8 niveaux exponentiels ─────────────────
-  { id:"r1", icon:"🎯", name:"Tireur",           fam:"rép", tier:1, desc:"50 bonnes réponses",          color:"#6b7280", check:(s)=>s.correct>=50 },
-  { id:"r2", icon:"🎯", name:"Précis",            fam:"rép", tier:2, desc:"200 bonnes réponses",         color:"#cd7f32", check:(s)=>s.correct>=200 },
-  { id:"r3", icon:"🎯", name:"Sniper",            fam:"rép", tier:3, desc:"500 bonnes réponses",         color:"#94a3b8", check:(s)=>s.correct>=500 },
-  { id:"r4", icon:"🎯", name:"Expert",            fam:"rép", tier:4, desc:"1 000 bonnes réponses",       color:"#eab308", check:(s)=>s.correct>=1000 },
-  { id:"r5", icon:"🎯", name:"Maître Tireur",     fam:"rép", tier:5, desc:"2 500 bonnes réponses",       color:"#06b6d4", check:(s)=>s.correct>=2500 },
-  { id:"r6", icon:"🎯", name:"Légende",           fam:"rép", tier:6, desc:"5 000 bonnes réponses",       color:"#a855f7", check:(s)=>s.correct>=5000 },
-  { id:"r7", icon:"🎯", name:"Indestructible",    fam:"rép", tier:7, desc:"10 000 bonnes réponses",      color:"#e8392a", check:(s)=>s.correct>=10000 },
-  { id:"r8", icon:"🎯", name:"Mythique",          fam:"rép", tier:8, desc:"25 000 bonnes réponses",      color:"#f07320", check:(s)=>s.correct>=25000 },
+  // ── BONNES RÉPONSES — 12 niveaux exponentiels ────────────────
+  { id:"r1",  icon:"🎯", name:"Recrue",            fam:"rép", tier:1,  desc:"50 bonnes réponses",           color:"#6b7280", check:(s)=>s.correct>=50 },
+  { id:"r2",  icon:"🎯", name:"Tireur",            fam:"rép", tier:2,  desc:"150 bonnes réponses",          color:"#78716c", check:(s)=>s.correct>=150 },
+  { id:"r3",  icon:"🎯", name:"Précis",            fam:"rép", tier:3,  desc:"400 bonnes réponses",          color:"#cd7f32", check:(s)=>s.correct>=400 },
+  { id:"r4",  icon:"🎯", name:"Sniper",            fam:"rép", tier:4,  desc:"1 000 bonnes réponses",        color:"#94a3b8", check:(s)=>s.correct>=1000 },
+  { id:"r5",  icon:"🎯", name:"Fin Tireur",        fam:"rép", tier:5,  desc:"2 000 bonnes réponses",        color:"#94a3b8", check:(s)=>s.correct>=2000 },
+  { id:"r6",  icon:"🎯", name:"Expert",            fam:"rép", tier:6,  desc:"4 000 bonnes réponses",        color:"#eab308", check:(s)=>s.correct>=4000 },
+  { id:"r7",  icon:"🎯", name:"Maître Tireur",     fam:"rép", tier:7,  desc:"8 000 bonnes réponses",        color:"#eab308", check:(s)=>s.correct>=8000 },
+  { id:"r8",  icon:"🎯", name:"Élite",             fam:"rép", tier:8,  desc:"15 000 bonnes réponses",       color:"#06b6d4", check:(s)=>s.correct>=15000 },
+  { id:"r9",  icon:"🎯", name:"Légende",           fam:"rép", tier:9,  desc:"25 000 bonnes réponses",       color:"#a855f7", check:(s)=>s.correct>=25000 },
+  { id:"r10", icon:"🎯", name:"Indestructible",    fam:"rép", tier:10, desc:"50 000 bonnes réponses",       color:"#e8392a", check:(s)=>s.correct>=50000 },
+  { id:"r11", icon:"🎯", name:"Mythique",          fam:"rép", tier:11, desc:"100 000 bonnes réponses",      color:"#e8392a", check:(s)=>s.correct>=100000 },
+  { id:"r12", icon:"🎯", name:"Omniscient",        fam:"rép", tier:12, desc:"250 000 bonnes réponses",      color:"#f07320", check:(s)=>s.correct>=250000 },
 
-  // ── EXAMENS RÉALISÉS — 8 niveaux ────────────────────────────
-  { id:"e1", icon:"📋", name:"Recrue",            fam:"exm", tier:1, desc:"5 examens réalisés",          color:"#6b7280", check:(s)=>s.total>=5 },
-  { id:"e2", icon:"📋", name:"Engagé",            fam:"exm", tier:2, desc:"15 examens",                  color:"#cd7f32", check:(s)=>s.total>=15 },
-  { id:"e3", icon:"📋", name:"Régulier",          fam:"exm", tier:3, desc:"40 examens",                  color:"#94a3b8", check:(s)=>s.total>=40 },
-  { id:"e4", icon:"📋", name:"Assidu",            fam:"exm", tier:4, desc:"100 examens",                 color:"#eab308", check:(s)=>s.total>=100 },
-  { id:"e5", icon:"📋", name:"Vétéran",           fam:"exm", tier:5, desc:"250 examens",                 color:"#06b6d4", check:(s)=>s.total>=250 },
-  { id:"e6", icon:"📋", name:"Aguerri",           fam:"exm", tier:6, desc:"500 examens",                 color:"#a855f7", check:(s)=>s.total>=500 },
-  { id:"e7", icon:"📋", name:"Élite",             fam:"exm", tier:7, desc:"1 000 examens",               color:"#e8392a", check:(s)=>s.total>=1000 },
-  { id:"e8", icon:"📋", name:"Intouchable",       fam:"exm", tier:8, desc:"2 500 examens",               color:"#f07320", check:(s)=>s.total>=2500 },
+  // ── EXAMENS RÉALISÉS — 12 niveaux ────────────────────────────
+  { id:"e1",  icon:"📋", name:"Recrue",            fam:"exm", tier:1,  desc:"3 examens réalisés",           color:"#6b7280", check:(s)=>s.total>=3 },
+  { id:"e2",  icon:"📋", name:"Engagé",            fam:"exm", tier:2,  desc:"8 examens",                    color:"#78716c", check:(s)=>s.total>=8 },
+  { id:"e3",  icon:"📋", name:"Régulier",          fam:"exm", tier:3,  desc:"20 examens",                   color:"#cd7f32", check:(s)=>s.total>=20 },
+  { id:"e4",  icon:"📋", name:"Assidu",            fam:"exm", tier:4,  desc:"50 examens",                   color:"#94a3b8", check:(s)=>s.total>=50 },
+  { id:"e5",  icon:"📋", name:"Tenace",            fam:"exm", tier:5,  desc:"100 examens",                  color:"#94a3b8", check:(s)=>s.total>=100 },
+  { id:"e6",  icon:"📋", name:"Vétéran",           fam:"exm", tier:6,  desc:"200 examens",                  color:"#eab308", check:(s)=>s.total>=200 },
+  { id:"e7",  icon:"📋", name:"Aguerri",           fam:"exm", tier:7,  desc:"400 examens",                  color:"#eab308", check:(s)=>s.total>=400 },
+  { id:"e8",  icon:"📋", name:"Élite",             fam:"exm", tier:8,  desc:"750 examens",                  color:"#06b6d4", check:(s)=>s.total>=750 },
+  { id:"e9",  icon:"📋", name:"Invaincu",          fam:"exm", tier:9,  desc:"1 500 examens",                color:"#a855f7", check:(s)=>s.total>=1500 },
+  { id:"e10", icon:"📋", name:"Légendaire",        fam:"exm", tier:10, desc:"3 000 examens",                color:"#e8392a", check:(s)=>s.total>=3000 },
+  { id:"e11", icon:"📋", name:"Intouchable",       fam:"exm", tier:11, desc:"6 000 examens",                color:"#e8392a", check:(s)=>s.total>=6000 },
+  { id:"e12", icon:"📋", name:"Immortel",          fam:"exm", tier:12, desc:"12 000 examens",               color:"#f07320", check:(s)=>s.total>=12000 },
 
-  // ── EXAMENS PARFAITS 100% — 7 niveaux ───────────────────────
-  { id:"p1", icon:"💯", name:"Première Flamme",   fam:"prf", tier:1, desc:"1 examen à 100%",             color:"#6b7280", check:(s)=>s.perfects>=1 },
-  { id:"p2", icon:"💯", name:"Flamme Pure",        fam:"prf", tier:2, desc:"5 examens à 100%",            color:"#cd7f32", check:(s)=>s.perfects>=5 },
-  { id:"p3", icon:"💯", name:"Sans Faute",         fam:"prf", tier:3, desc:"15 examens à 100%",           color:"#94a3b8", check:(s)=>s.perfects>=15 },
-  { id:"p4", icon:"💯", name:"Perfection",         fam:"prf", tier:4, desc:"40 examens à 100%",           color:"#eab308", check:(s)=>s.perfects>=40 },
-  { id:"p5", icon:"💯", name:"Absolu",             fam:"prf", tier:5, desc:"100 examens à 100%",          color:"#06b6d4", check:(s)=>s.perfects>=100 },
-  { id:"p6", icon:"💯", name:"Divin",              fam:"prf", tier:6, desc:"300 examens à 100%",          color:"#a855f7", check:(s)=>s.perfects>=300 },
-  { id:"p7", icon:"💯", name:"Au-delà du Bien",    fam:"prf", tier:7, desc:"750 examens à 100%",          color:"#e8392a", check:(s)=>s.perfects>=750 },
+  // ── EXAMENS PARFAITS 100% — 10 niveaux ───────────────────────
+  { id:"p1",  icon:"💯", name:"Première Flamme",   fam:"prf", tier:1,  desc:"1 examen à 100%",              color:"#6b7280", check:(s)=>s.perfects>=1 },
+  { id:"p2",  icon:"💯", name:"Flamme Pure",       fam:"prf", tier:2,  desc:"3 examens à 100%",             color:"#78716c", check:(s)=>s.perfects>=3 },
+  { id:"p3",  icon:"💯", name:"Sans Faute",        fam:"prf", tier:3,  desc:"8 examens à 100%",             color:"#cd7f32", check:(s)=>s.perfects>=8 },
+  { id:"p4",  icon:"💯", name:"Infaillible",       fam:"prf", tier:4,  desc:"20 examens à 100%",            color:"#94a3b8", check:(s)=>s.perfects>=20 },
+  { id:"p5",  icon:"💯", name:"Perfection",        fam:"prf", tier:5,  desc:"50 examens à 100%",            color:"#eab308", check:(s)=>s.perfects>=50 },
+  { id:"p6",  icon:"💯", name:"Absolu",            fam:"prf", tier:6,  desc:"120 examens à 100%",           color:"#eab308", check:(s)=>s.perfects>=120 },
+  { id:"p7",  icon:"💯", name:"Divin",             fam:"prf", tier:7,  desc:"300 examens à 100%",           color:"#06b6d4", check:(s)=>s.perfects>=300 },
+  { id:"p8",  icon:"💯", name:"Transcendant",      fam:"prf", tier:8,  desc:"600 examens à 100%",           color:"#a855f7", check:(s)=>s.perfects>=600 },
+  { id:"p9",  icon:"💯", name:"Au-delà du Réel",   fam:"prf", tier:9,  desc:"1 200 examens à 100%",         color:"#e8392a", check:(s)=>s.perfects>=1200 },
+  { id:"p10", icon:"💯", name:"L'Intouchable",     fam:"prf", tier:10, desc:"2 500 examens à 100%",         color:"#f07320", check:(s)=>s.perfects>=2500 },
 
-  // ── EXCELLENCE ≥ 90% — 6 niveaux ────────────────────────────
-  { id:"n1", icon:"⭐", name:"Prometteur",         fam:"exc", tier:1, desc:"5 examens à 90%+",            color:"#6b7280", check:(s)=>s.above90>=5 },
-  { id:"n2", icon:"⭐", name:"Brillant",           fam:"exc", tier:2, desc:"20 examens à 90%+",           color:"#cd7f32", check:(s)=>s.above90>=20 },
-  { id:"n3", icon:"⭐", name:"Distingué",          fam:"exc", tier:3, desc:"60 examens à 90%+",           color:"#94a3b8", check:(s)=>s.above90>=60 },
-  { id:"n4", icon:"⭐", name:"Exceptionnel",       fam:"exc", tier:4, desc:"150 examens à 90%+",          color:"#eab308", check:(s)=>s.above90>=150 },
-  { id:"n5", icon:"⭐", name:"Élite des Élites",   fam:"exc", tier:5, desc:"400 examens à 90%+",          color:"#06b6d4", check:(s)=>s.above90>=400 },
-  { id:"n6", icon:"⭐", name:"Intouchable",        fam:"exc", tier:6, desc:"1 000 examens à 90%+",        color:"#a855f7", check:(s)=>s.above90>=1000 },
+  // ── EXCELLENCE ≥ 90% — 10 niveaux ────────────────────────────
+  { id:"n1",  icon:"⭐", name:"Prometteur",        fam:"exc", tier:1,  desc:"3 examens à 90%+",             color:"#6b7280", check:(s)=>s.above90>=3 },
+  { id:"n2",  icon:"⭐", name:"Brillant",          fam:"exc", tier:2,  desc:"8 examens à 90%+",             color:"#78716c", check:(s)=>s.above90>=8 },
+  { id:"n3",  icon:"⭐", name:"Distingué",         fam:"exc", tier:3,  desc:"20 examens à 90%+",            color:"#cd7f32", check:(s)=>s.above90>=20 },
+  { id:"n4",  icon:"⭐", name:"Remarquable",       fam:"exc", tier:4,  desc:"50 examens à 90%+",            color:"#94a3b8", check:(s)=>s.above90>=50 },
+  { id:"n5",  icon:"⭐", name:"Exceptionnel",      fam:"exc", tier:5,  desc:"120 examens à 90%+",           color:"#eab308", check:(s)=>s.above90>=120 },
+  { id:"n6",  icon:"⭐", name:"Hors Norme",        fam:"exc", tier:6,  desc:"300 examens à 90%+",           color:"#eab308", check:(s)=>s.above90>=300 },
+  { id:"n7",  icon:"⭐", name:"Élite des Élites",  fam:"exc", tier:7,  desc:"700 examens à 90%+",           color:"#06b6d4", check:(s)=>s.above90>=700 },
+  { id:"n8",  icon:"⭐", name:"Surhumain",         fam:"exc", tier:8,  desc:"1 500 examens à 90%+",         color:"#a855f7", check:(s)=>s.above90>=1500 },
+  { id:"n9",  icon:"⭐", name:"Légendaire",        fam:"exc", tier:9,  desc:"3 000 examens à 90%+",         color:"#e8392a", check:(s)=>s.above90>=3000 },
+  { id:"n10", icon:"⭐", name:"Intouchable",       fam:"exc", tier:10, desc:"6 000 examens à 90%+",         color:"#f07320", check:(s)=>s.above90>=6000 },
 
-  // ── RÉUSSITE ≥ 80% — 5 niveaux ──────────────────────────────
-  { id:"q1", icon:"🔥", name:"Solide",             fam:"80p", tier:1, desc:"10 examens à 80%+",           color:"#6b7280", check:(s)=>s.above80>=10 },
-  { id:"q2", icon:"🔥", name:"Performant",         fam:"80p", tier:2, desc:"40 examens à 80%+",           color:"#cd7f32", check:(s)=>s.above80>=40 },
-  { id:"q3", icon:"🔥", name:"Irréprochable",      fam:"80p", tier:3, desc:"120 examens à 80%+",          color:"#94a3b8", check:(s)=>s.above80>=120 },
-  { id:"q4", icon:"🔥", name:"Invaincu",           fam:"80p", tier:4, desc:"350 examens à 80%+",          color:"#eab308", check:(s)=>s.above80>=350 },
-  { id:"q5", icon:"🔥", name:"Phénomène",          fam:"80p", tier:5, desc:"800 examens à 80%+",          color:"#06b6d4", check:(s)=>s.above80>=800 },
+  // ── RÉUSSITE ≥ 80% — 10 niveaux ──────────────────────────────
+  { id:"q1",  icon:"🔥", name:"Solide",            fam:"80p", tier:1,  desc:"5 examens à 80%+",             color:"#6b7280", check:(s)=>s.above80>=5 },
+  { id:"q2",  icon:"🔥", name:"Constant",          fam:"80p", tier:2,  desc:"15 examens à 80%+",            color:"#78716c", check:(s)=>s.above80>=15 },
+  { id:"q3",  icon:"🔥", name:"Performant",        fam:"80p", tier:3,  desc:"40 examens à 80%+",            color:"#cd7f32", check:(s)=>s.above80>=40 },
+  { id:"q4",  icon:"🔥", name:"Irréprochable",     fam:"80p", tier:4,  desc:"100 examens à 80%+",           color:"#94a3b8", check:(s)=>s.above80>=100 },
+  { id:"q5",  icon:"🔥", name:"Dominateur",        fam:"80p", tier:5,  desc:"250 examens à 80%+",           color:"#eab308", check:(s)=>s.above80>=250 },
+  { id:"q6",  icon:"🔥", name:"Invaincu",          fam:"80p", tier:6,  desc:"500 examens à 80%+",           color:"#eab308", check:(s)=>s.above80>=500 },
+  { id:"q7",  icon:"🔥", name:"Phénomène",         fam:"80p", tier:7,  desc:"1 000 examens à 80%+",         color:"#06b6d4", check:(s)=>s.above80>=1000 },
+  { id:"q8",  icon:"🔥", name:"Transcendant",      fam:"80p", tier:8,  desc:"2 000 examens à 80%+",         color:"#a855f7", check:(s)=>s.above80>=2000 },
+  { id:"q9",  icon:"🔥", name:"Mythique",          fam:"80p", tier:9,  desc:"4 000 examens à 80%+",         color:"#e8392a", check:(s)=>s.above80>=4000 },
+  { id:"q10", icon:"🔥", name:"Immortel",          fam:"80p", tier:10, desc:"8 000 examens à 80%+",         color:"#f07320", check:(s)=>s.above80>=8000 },
 
-  // ── ASSIDUITÉ — JOURS CONSÉCUTIFS — 6 niveaux ───────────────
-  { id:"d1", icon:"📅", name:"Régulier",           fam:"day", tier:1, desc:"3 jours consécutifs",         color:"#6b7280", check:(s,c,r)=>_consecutiveDays(r)>=3 },
-  { id:"d2", icon:"📅", name:"Dévoué",             fam:"day", tier:2, desc:"7 jours consécutifs",         color:"#cd7f32", check:(s,c,r)=>_consecutiveDays(r)>=7 },
-  { id:"d3", icon:"📅", name:"Persévérant",        fam:"day", tier:3, desc:"14 jours consécutifs",        color:"#94a3b8", check:(s,c,r)=>_consecutiveDays(r)>=14 },
-  { id:"d4", icon:"📅", name:"Intransigeant",      fam:"day", tier:4, desc:"30 jours consécutifs",        color:"#eab308", check:(s,c,r)=>_consecutiveDays(r)>=30 },
-  { id:"d5", icon:"📅", name:"Inconditionnel",     fam:"day", tier:5, desc:"60 jours consécutifs",        color:"#06b6d4", check:(s,c,r)=>_consecutiveDays(r)>=60 },
-  { id:"d6", icon:"📅", name:"Légionnaire",        fam:"day", tier:6, desc:"100 jours consécutifs",       color:"#a855f7", check:(s,c,r)=>_consecutiveDays(r)>=100 },
+  // ── ASSIDUITÉ JOURS CONSÉCUTIFS — 10 niveaux ─────────────────
+  { id:"d1",  icon:"📅", name:"1re Garde",         fam:"day", tier:1,  desc:"2 jours consécutifs",          color:"#6b7280", check:(s,c,r)=>_consecutiveDays(r)>=2 },
+  { id:"d2",  icon:"📅", name:"Régulier",          fam:"day", tier:2,  desc:"4 jours consécutifs",          color:"#78716c", check:(s,c,r)=>_consecutiveDays(r)>=4 },
+  { id:"d3",  icon:"📅", name:"Dévoué",            fam:"day", tier:3,  desc:"7 jours consécutifs",          color:"#cd7f32", check:(s,c,r)=>_consecutiveDays(r)>=7 },
+  { id:"d4",  icon:"📅", name:"Persévérant",       fam:"day", tier:4,  desc:"14 jours consécutifs",         color:"#94a3b8", check:(s,c,r)=>_consecutiveDays(r)>=14 },
+  { id:"d5",  icon:"📅", name:"Infatigable",       fam:"day", tier:5,  desc:"21 jours consécutifs",         color:"#94a3b8", check:(s,c,r)=>_consecutiveDays(r)>=21 },
+  { id:"d6",  icon:"📅", name:"Intransigeant",     fam:"day", tier:6,  desc:"30 jours consécutifs",         color:"#eab308", check:(s,c,r)=>_consecutiveDays(r)>=30 },
+  { id:"d7",  icon:"📅", name:"Inconditionnel",    fam:"day", tier:7,  desc:"45 jours consécutifs",         color:"#eab308", check:(s,c,r)=>_consecutiveDays(r)>=45 },
+  { id:"d8",  icon:"📅", name:"Légionnaire",       fam:"day", tier:8,  desc:"60 jours consécutifs",         color:"#06b6d4", check:(s,c,r)=>_consecutiveDays(r)>=60 },
+  { id:"d9",  icon:"📅", name:"Impérial",          fam:"day", tier:9,  desc:"90 jours consécutifs",         color:"#a855f7", check:(s,c,r)=>_consecutiveDays(r)>=90 },
+  { id:"d10", icon:"📅", name:"Éternel",           fam:"day", tier:10, desc:"180 jours consécutifs",        color:"#e8392a", check:(s,c,r)=>_consecutiveDays(r)>=180 },
 
-  // ── CADENCE HEBDOMADAIRE — 4 niveaux ────────────────────────
-  { id:"w1", icon:"⚡", name:"Actif",              fam:"wkl", tier:1, desc:"5 examens en une semaine",    color:"#6b7280", check:(s,c,r)=>_weeklyExams(r)>=5 },
-  { id:"w2", icon:"⚡", name:"Intensif",           fam:"wkl", tier:2, desc:"10 examens en une semaine",   color:"#cd7f32", check:(s,c,r)=>_weeklyExams(r)>=10 },
-  { id:"w3", icon:"⚡", name:"Turbo",              fam:"wkl", tier:3, desc:"20 examens en une semaine",   color:"#94a3b8", check:(s,c,r)=>_weeklyExams(r)>=20 },
-  { id:"w4", icon:"⚡", name:"Machine de Guerre",  fam:"wkl", tier:4, desc:"50 examens en une semaine",   color:"#eab308", check:(s,c,r)=>_weeklyExams(r)>=50 },
+  // ── CADENCE HEBDOMADAIRE — 8 niveaux ─────────────────────────
+  { id:"w1",  icon:"⚡", name:"Actif",             fam:"wkl", tier:1,  desc:"3 examens en une semaine",     color:"#6b7280", check:(s,c,r)=>_weeklyExams(r)>=3 },
+  { id:"w2",  icon:"⚡", name:"Dynamique",         fam:"wkl", tier:2,  desc:"5 examens en une semaine",     color:"#78716c", check:(s,c,r)=>_weeklyExams(r)>=5 },
+  { id:"w3",  icon:"⚡", name:"Intensif",          fam:"wkl", tier:3,  desc:"10 examens en une semaine",    color:"#cd7f32", check:(s,c,r)=>_weeklyExams(r)>=10 },
+  { id:"w4",  icon:"⚡", name:"Turbo",             fam:"wkl", tier:4,  desc:"20 examens en une semaine",    color:"#94a3b8", check:(s,c,r)=>_weeklyExams(r)>=20 },
+  { id:"w5",  icon:"⚡", name:"Explosif",          fam:"wkl", tier:5,  desc:"35 examens en une semaine",    color:"#eab308", check:(s,c,r)=>_weeklyExams(r)>=35 },
+  { id:"w6",  icon:"⚡", name:"Machine de Guerre", fam:"wkl", tier:6,  desc:"50 examens en une semaine",    color:"#06b6d4", check:(s,c,r)=>_weeklyExams(r)>=50 },
+  { id:"w7",  icon:"⚡", name:"Supersonique",      fam:"wkl", tier:7,  desc:"75 examens en une semaine",    color:"#a855f7", check:(s,c,r)=>_weeklyExams(r)>=75 },
+  { id:"w8",  icon:"⚡", name:"Ultrasonique",      fam:"wkl", tier:8,  desc:"100 examens en une semaine",   color:"#e8392a", check:(s,c,r)=>_weeklyExams(r)>=100 },
 
-  // ── CATÉGORIES MAÎTRISÉES (moy ≥ 80%) — 4 niveaux ──────────
-  { id:"m1", icon:"🏆", name:"Spécialiste",        fam:"cat", tier:1, desc:"1 catégorie maîtrisée (moy. ≥ 80%)",       color:"#cd7f32", check:(s,c,r)=>_masteredCats(r)>=1 },
-  { id:"m2", icon:"🏆", name:"Polyvalent",         fam:"cat", tier:2, desc:"2 catégories maîtrisées",                   color:"#94a3b8", check:(s,c,r)=>_masteredCats(r)>=2 },
-  { id:"m3", icon:"🏆", name:"Encyclopédiste",     fam:"cat", tier:3, desc:"3 catégories maîtrisées",                   color:"#eab308", check:(s,c,r)=>_masteredCats(r)>=3 },
-  { id:"m4", icon:"🏆", name:"Omniscient",         fam:"cat", tier:4, desc:"Toutes les catégories maîtrisées",          color:"#e8392a", check:(s,cats,r)=>cats.length>0&&_masteredCats(r)>=cats.length },
+  // ── CATÉGORIES MAÎTRISÉES (moy ≥ 80%) — 6 niveaux ────────────
+  { id:"m1",  icon:"🏆", name:"Spécialiste",       fam:"cat", tier:1,  desc:"1 catégorie maîtrisée (≥80%)", color:"#6b7280", check:(s,c,r)=>_masteredCats(r)>=1 },
+  { id:"m2",  icon:"🏆", name:"Polyvalent",        fam:"cat", tier:2,  desc:"2 catégories maîtrisées",      color:"#cd7f32", check:(s,c,r)=>_masteredCats(r)>=2 },
+  { id:"m3",  icon:"🏆", name:"Encyclopédiste",    fam:"cat", tier:3,  desc:"3 catégories maîtrisées",      color:"#94a3b8", check:(s,c,r)=>_masteredCats(r)>=3 },
+  { id:"m4",  icon:"🏆", name:"Érudit",            fam:"cat", tier:4,  desc:"4 catégories maîtrisées",      color:"#eab308", check:(s,c,r)=>_masteredCats(r)>=4 },
+  { id:"m5",  icon:"🏆", name:"Maître",            fam:"cat", tier:5,  desc:"5 catégories maîtrisées",      color:"#06b6d4", check:(s,c,r)=>_masteredCats(r)>=5 },
+  { id:"m6",  icon:"🏆", name:"Omniscient",        fam:"cat", tier:6,  desc:"Toutes les catégories maîtr.", color:"#e8392a", check:(s,cats,r)=>cats.length>0&&_masteredCats(r)>=cats.length },
 
-  // ── PROGRESSION SUR UNE CATÉGORIE — 4 niveaux ───────────────
-  { id:"g_1", icon:"📈", name:"En Progression",    fam:"prg", tier:1, desc:"Progression de +10 pts sur une catégorie", color:"#6b7280", check:(s,c,r)=>_maxCatProgress(r)>=10 },
-  { id:"g_2", icon:"📈", name:"Montée en Flèche",  fam:"prg", tier:2, desc:"Progression de +20 pts",                   color:"#cd7f32", check:(s,c,r)=>_maxCatProgress(r)>=20 },
-  { id:"g_3", icon:"📈", name:"Ascension",         fam:"prg", tier:3, desc:"Progression de +35 pts",                   color:"#94a3b8", check:(s,c,r)=>_maxCatProgress(r)>=35 },
-  { id:"g_4", icon:"📈", name:"Transformation",    fam:"prg", tier:4, desc:"Progression de +50 pts",                   color:"#eab308", check:(s,c,r)=>_maxCatProgress(r)>=50 },
+  // ── PROGRESSION SUR UNE CATÉGORIE — 6 niveaux ────────────────
+  { id:"g_1", icon:"📈", name:"En Progression",    fam:"prg", tier:1,  desc:"Progression de +10 pts",       color:"#6b7280", check:(s,c,r)=>_maxCatProgress(r)>=10 },
+  { id:"g_2", icon:"📈", name:"Montée en Flèche",  fam:"prg", tier:2,  desc:"Progression de +20 pts",       color:"#78716c", check:(s,c,r)=>_maxCatProgress(r)>=20 },
+  { id:"g_3", icon:"📈", name:"Ascension",         fam:"prg", tier:3,  desc:"Progression de +30 pts",       color:"#cd7f32", check:(s,c,r)=>_maxCatProgress(r)>=30 },
+  { id:"g_4", icon:"📈", name:"Décollage",         fam:"prg", tier:4,  desc:"Progression de +40 pts",       color:"#94a3b8", check:(s,c,r)=>_maxCatProgress(r)>=40 },
+  { id:"g_5", icon:"📈", name:"Transformation",    fam:"prg", tier:5,  desc:"Progression de +50 pts",       color:"#eab308", check:(s,c,r)=>_maxCatProgress(r)>=50 },
+  { id:"g_6", icon:"📈", name:"Métamorphose",      fam:"prg", tier:6,  desc:"Progression de +65 pts",       color:"#e8392a", check:(s,c,r)=>_maxCatProgress(r)>=65 },
 
   // ── BADGES SPÉCIAUX ──────────────────────────────────────────
-  { id:"x1", icon:"💪", name:"Résilient",          desc:"Réussir ≥70% après un échec <50% dans une catégorie",         color:"#f07320", check:(s,c,r)=>_hasRebound(r) },
-  { id:"x2", icon:"📝", name:"As de l'Examen Blanc",desc:"Score parfait sur un Examen Blanc",                          color:"#e8392a", check:(s,c,r)=>r.some(x=>x.cat_name==="Examen Blanc"&&x.pct===100) },
-  { id:"x3", icon:"🌙", name:"Journée Marathon",   desc:"3 examens dans la même journée",                              color:"#7c3aed", check:(s,c,r)=>_dailyCount(r)>=3 },
-  { id:"x4", icon:"🚒", name:"Toujours Debout",    desc:"10 examens consécutifs tous ≥ 60%",                           color:"#e8392a", check:(s,c,r)=>{const l=r.slice(-10);return l.length===10&&l.every(x=>x.pct>=60);} },
-  { id:"x5", icon:"🔭", name:"Visionnaire",        desc:"Moyenne générale ≥ 90% sur 10+ examens",                     color:"#a855f7", check:(s)=>s.avg>=90&&s.total>=10 },
-  { id:"x6", icon:"🌐", name:"Explorateur",        desc:"Au moins 1 examen dans chaque catégorie",                    color:"#3b82f6", check:(s,cats)=>cats.length>0&&s.uniqueCats>=cats.length },
+  { id:"x1",  icon:"💪", name:"Résilient",         desc:"Réussir ≥70% après un échec <50%",                 color:"#f07320", check:(s,c,r)=>_hasRebound(r) },
+  { id:"x2",  icon:"📝", name:"As de l'Examen Blanc",desc:"Score parfait sur un Examen Blanc",              color:"#e8392a", check:(s,c,r)=>r.some(x=>x.cat_name==="Examen Blanc"&&x.pct===100) },
+  { id:"x3",  icon:"🌙", name:"Journée Marathon",  desc:"3 examens dans la même journée",                   color:"#7c3aed", check:(s,c,r)=>_dailyCount(r)>=3 },
+  { id:"x4",  icon:"🚒", name:"Toujours Debout",   desc:"10 examens consécutifs tous ≥ 60%",                color:"#e8392a", check:(s,c,r)=>{const l=r.slice(-10);return l.length===10&&l.every(x=>x.pct>=60);} },
+  { id:"x5",  icon:"🔭", name:"Visionnaire",       desc:"Moyenne ≥ 90% sur 10+ examens",                    color:"#a855f7", check:(s)=>s.avg>=90&&s.total>=10 },
+  { id:"x6",  icon:"🌐", name:"Explorateur",       desc:"Au moins 1 examen dans chaque catégorie",          color:"#3b82f6", check:(s,cats)=>cats.length>0&&s.uniqueCats>=cats.length },
 ];
 
 const _masteredCats = (results, threshold=80) => {
@@ -424,7 +456,278 @@ const BadgeCard = ({badge, unlocked}) => (
   </div>
 );
 
-// ─── FORMULAIRES ─────────────────────────────────────────────────
+// ─── MESSAGES DU GRAND CHEF PAR GRADE ───────────────────────────
+const GRADE_MESSAGES = {
+  g1:  { title:"Bienvenue, Jeune Sapeur !", msg:"En votre qualité de JSP, vous posez aujourd'hui le premier pas sur un chemin exigeant et noble. La formation est votre arme. Saisissez-la avec détermination." },
+  g2:  { title:"Sapeur 2e classe — la flamme s'allume.", msg:"Vous avez prouvé votre volonté d'apprendre. Le service public commence à vous reconnaître. Continuez sur cette voie sans faillir." },
+  g3:  { title:"Sapeur 1re classe — vous progressez.", msg:"Votre régularité parle pour vous. Un sapeur de 1re classe sait que chaque examen est un entraînement pour la vraie intervention." },
+  g4:  { title:"Caporal — premier commandement.", msg:"Vous êtes désormais capable d'encadrer. Le grade de Caporal est une responsabilité autant qu'un honneur. Ne l'oubliez jamais." },
+  g5:  { title:"Caporal-Chef — l'expérience s'affirme.", msg:"Votre savoir s'approfondit. Un Caporal-Chef est un pilier de terrain. Vos camarades comptent sur vous dans les moments difficiles." },
+  g6:  { title:"Sergent — vous êtes sous-officier.", msg:"La barre vient de monter d'un cran considérable. Sergeant, vous incarnez désormais l'autorité de terrain. Portez-la avec dignité." },
+  g7:  { title:"Sergent-Chef — l'élite du terrain.", msg:"Peu parviennent ici. Votre maîtrise théorique est exemplaire. Vous êtes un modèle pour les plus jeunes. Assumez ce rôle pleinement." },
+  g8:  { title:"Adjudant — officier subalterne.", msg:"Vous franchissez le seuil des officiers subalternes. Ce grade est le fruit d'une persévérance que beaucoup ne connaîtront jamais. Respect." },
+  g9:  { title:"Adjudant-Chef — au sommet du terrain.", msg:"Vous représentez l'excellence opérationnelle. Adjudant-Chef, votre expertise est un trésor pour votre centre. Transmettez-la." },
+  g10: { title:"Lieutenant — officier breveté.", msg:"Vous accédez au grade d'officier. C'est une distinction rare sur cette plateforme. La République vous confie des hommes. Soyez-en digne." },
+  g11: { title:"Capitaine — commandant d'unité.", msg:"Le Capitaine commande. Il décide dans l'urgence, il porte la responsabilité des siens. Votre niveau de connaissance est désormais hors du commun." },
+  g12: { title:"Commandant — officier supérieur.", msg:"Votre parcours force l'admiration. Commandant, vous êtes entré dans la caste des officiers supérieurs. Le service doit tout à votre engagement." },
+  g13: { title:"Lieutenant-Colonel — une carrière exemplaire.", msg:"Peu de sapeurs atteignent ce sommet. Votre dédicace à la formation est un exemple vivant que la connaissance sauve des vies." },
+  g14: { title:"Colonel — Colonel Hors Classe.", msg:"Vous avez atteint l'un des grades les plus élevés du corps. Votre maîtrise est encyclopédique. Le corps tout entier salue votre excellence." },
+  g15: { title:"Contrôleur Général — honneur suprême.", msg:"Vous êtes entré dans la légende de cette plateforme. Contrôleur Général, votre nom sera cité en exemple aux générations futures de sapeurs." },
+  g16: { title:"Contrôleur Général d'État — absolu.", msg:"Il n'existe aucun grade au-dessus du vôtre. Vous avez tout accompli. La Nation vous doit une reconnaissance éternelle. Gloire à vous, Sapeur." },
+};
+
+// ─── FEUX D'ARTIFICE (Canvas) ────────────────────────────────────
+function FireworksCanvas({intensity=1}) {
+  const canvasRef = useRef(null);
+  const rafRef    = useRef(null);
+  useEffect(()=>{
+    const canvas = canvasRef.current;
+    if(!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width  = window.innerWidth;
+    const H = canvas.height = window.innerHeight;
+    const particles = [];
+    const colors = ["#e8392a","#f07320","#eab308","#22c55e","#3b82f6","#a855f7","#ffffff","#ff6b9d","#00d4ff","#ffdd57"];
+
+    class Particle {
+      constructor(x,y,col,isSpark=false){
+        this.x=x; this.y=y; this.col=col;
+        const angle=Math.random()*Math.PI*2;
+        const speed=isSpark?Math.random()*8+3:Math.random()*4+1;
+        this.vx=Math.cos(angle)*speed;
+        this.vy=Math.sin(angle)*speed-(isSpark?2:0);
+        this.alpha=1;
+        this.decay=isSpark?0.012+Math.random()*0.015:0.018+Math.random()*0.01;
+        this.r=isSpark?Math.random()*2.5+0.5:Math.random()*3+1;
+        this.gravity=0.06;
+        this.trail=[];
+      }
+      update(){
+        this.trail.push({x:this.x,y:this.y,a:this.alpha});
+        if(this.trail.length>6) this.trail.shift();
+        this.vy+=this.gravity;
+        this.x+=this.vx; this.y+=this.vy;
+        this.vx*=0.98; this.vy*=0.98;
+        this.alpha-=this.decay;
+      }
+      draw(ctx){
+        // Trail
+        this.trail.forEach((t,i)=>{
+          ctx.beginPath();
+          ctx.arc(t.x,t.y,this.r*0.5,0,Math.PI*2);
+          ctx.fillStyle=this.col+(Math.floor(t.a*80).toString(16).padStart(2,"0"));
+          ctx.fill();
+        });
+        ctx.beginPath();
+        ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+        ctx.fillStyle=this.col+(Math.floor(this.alpha*255).toString(16).padStart(2,"0"));
+        ctx.fill();
+      }
+    }
+
+    const burst = (x,y) => {
+      const col = colors[Math.floor(Math.random()*colors.length)];
+      const col2= colors[Math.floor(Math.random()*colors.length)];
+      const n = Math.floor(60+Math.random()*60);
+      for(let i=0;i<n;i++) particles.push(new Particle(x,y,i%2===0?col:col2,true));
+      // Petite traînée centrale
+      for(let i=0;i<12;i++) particles.push(new Particle(x,y,"#ffffff",false));
+    };
+
+    // Lancer des feux d'artifice à intervalles
+    const launches = [];
+    const schedule = () => {
+      const delay = 200+Math.random()*600/intensity;
+      const id = setTimeout(()=>{
+        const x = W*0.15+Math.random()*W*0.7;
+        const y = H*0.1+Math.random()*H*0.45;
+        burst(x,y);
+        schedule();
+      }, delay);
+      launches.push(id);
+    };
+    // Démarrer plusieurs feux simultanément
+    for(let i=0;i<Math.ceil(3*intensity);i++){
+      setTimeout(()=>{ const x=W*0.1+Math.random()*W*0.8; const y=H*0.05+Math.random()*H*0.4; burst(x,y); }, i*300);
+    }
+    schedule();
+
+    const loop = () => {
+      ctx.clearRect(0,0,W,H);
+      for(let i=particles.length-1;i>=0;i--){
+        particles[i].update();
+        particles[i].draw(ctx);
+        if(particles[i].alpha<=0) particles.splice(i,1);
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    loop();
+
+    return ()=>{
+      cancelAnimationFrame(rafRef.current);
+      launches.forEach(clearTimeout);
+    };
+  },[intensity]);
+  return <canvas ref={canvasRef} style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:9998,width:"100%",height:"100%"}}/>;
+}
+
+// ─── MODAL PROMOTION DE GRADE ────────────────────────────────────
+function GradeUpModal({grade, pseudo, onClose}) {
+  const [phase,setPhase] = useState(0); // 0=entree 1=affiche 2=sortie
+  const msg = GRADE_MESSAGES[grade.id] || { title:"Félicitations !", msg:"Votre engagement est exemplaire." };
+  useEffect(()=>{
+    const t1=setTimeout(()=>setPhase(1),100);
+    return ()=>clearTimeout(t1);
+  },[]);
+  const close = () => { setPhase(2); setTimeout(onClose,500); };
+  return (
+    <>
+      <FireworksCanvas intensity={1.8}/>
+      <div onClick={close} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:24,cursor:"pointer",
+        opacity:phase===0?0:phase===2?0:1,transition:"opacity 0.5s"}}>
+        <div onClick={e=>e.stopPropagation()} style={{
+          background:`linear-gradient(160deg,#0e0e16,#1a1020)`,
+          border:`2px solid ${grade.color}66`,
+          borderRadius:12,
+          padding:"40px 36px",
+          maxWidth:560, width:"100%",
+          textAlign:"center",
+          boxShadow:`0 0 80px ${grade.color}44, 0 0 0 1px ${grade.color}22`,
+          transform:phase===1?"translateY(0) scale(1)":"translateY(30px) scale(0.95)",
+          transition:"transform 0.5s cubic-bezier(0.34,1.56,0.64,1)",
+          cursor:"default",
+          position:"relative",
+          overflow:"hidden",
+        }}>
+          {/* Fond rayonnant */}
+          <div style={{position:"absolute",inset:0,background:`radial-gradient(ellipse at 50% 30%, ${grade.color}18 0%, transparent 65%)`,pointerEvents:"none"}}/>
+
+          {/* En-tête solennel */}
+          <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:5,color:grade.color,textTransform:"uppercase",marginBottom:20,opacity:0.85}}>
+            — Ordre de Promotion —
+          </div>
+
+          {/* Insigne en grand */}
+          <div style={{display:"flex",justifyContent:"center",marginBottom:20,filter:`drop-shadow(0 0 20px ${grade.color}88)`}}>
+            <GradeInsignia id={grade.id} unlocked={true} size={100}/>
+          </div>
+
+          {/* Titre grade */}
+          <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(20px,5vw,30px)",fontWeight:700,letterSpacing:3,textTransform:"uppercase",color:grade.color,marginBottom:6}}>
+            {grade.name}
+          </div>
+
+          {/* Titre message */}
+          <div style={{fontFamily:"Oswald,sans-serif",fontSize:17,fontWeight:600,color:C.text,marginBottom:20,letterSpacing:0.5}}>
+            {msg.title}
+          </div>
+
+          {/* Séparateur */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+            <div style={{flex:1,height:1,background:`linear-gradient(to right, transparent, ${grade.color}88)`}}/>
+            <div style={{width:6,height:6,borderRadius:"50%",background:grade.color}}/>
+            <div style={{flex:1,height:1,background:`linear-gradient(to left, transparent, ${grade.color}88)`}}/>
+          </div>
+
+          {/* Message solennel */}
+          <div style={{background:"rgba(0,0,0,0.3)",border:`1px solid ${grade.color}22`,borderRadius:6,padding:"16px 20px",marginBottom:20,textAlign:"left"}}>
+            <p style={{color:C.text2,fontSize:14,lineHeight:1.8,margin:0,fontStyle:"italic"}}>
+              « {msg.msg} »
+            </p>
+            <div style={{marginTop:12,textAlign:"right"}}>
+              <div style={{color:grade.color,fontSize:12,fontFamily:"Oswald,sans-serif",letterSpacing:1}}>Le Grand Chef des SPV</div>
+              <div style={{color:C.muted,fontSize:11,marginTop:2,fontStyle:"italic"}}>Commandant en Chef de la Formation</div>
+            </div>
+          </div>
+
+          {/* Destinataire */}
+          <div style={{color:C.muted,fontSize:13,marginBottom:16}}>
+            Décerné à <strong style={{color:C.text}}>{pseudo}</strong>
+          </div>
+
+          {/* Phrase signature */}
+          <div style={{background:`linear-gradient(135deg,${grade.color}18,transparent)`,border:`1px solid ${grade.color}33`,borderRadius:20,padding:"8px 20px",display:"inline-block",marginBottom:24}}>
+            <span style={{fontSize:13,color:grade.color,fontWeight:700}}>🍺 C'est le moment de payer ta bière !</span>
+          </div>
+
+          <div>
+            <button onClick={close} style={{background:grade.color,color:"#000",border:"none",borderRadius:4,padding:"11px 28px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:14,letterSpacing:2,textTransform:"uppercase",boxShadow:`0 0 20px ${grade.color}88`}}>
+              CONTINUER →
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── MODAL DÉBLOCAGE BADGES ──────────────────────────────────────
+const BADGE_MOTIVATIONS = [
+  "Chaque badge est une intervention réussie de plus.",
+  "Votre détermination inspire vos coéquipiers.",
+  "La connaissance est votre équipement le plus précieux.",
+  "Un pas de plus vers l'excellence opérationnelle.",
+  "Vous avancez là où d'autres abandonnent.",
+  "Le courage, c'est aussi savoir se former.",
+  "Sapeur dans l'âme, expert dans la tête.",
+  "Le feu ne connaît pas la facilité. Vous non plus.",
+  "Votre progression est une fierté pour le corps.",
+  "On ne naît pas pompier, on le devient — comme vous.",
+];
+
+function BadgesUnlockModal({badges, onClose}) {
+  const [phase,setPhase] = useState(0);
+  const [idx,setIdx]     = useState(0);
+  const quote = BADGE_MOTIVATIONS[Math.floor(Math.random()*BADGE_MOTIVATIONS.length)];
+  useEffect(()=>{ const t=setTimeout(()=>setPhase(1),100); return()=>clearTimeout(t); },[]);
+  const close = ()=>{ setPhase(2); setTimeout(onClose,400); };
+  const nonGrades = badges.filter(b=>!b.grade);
+  if(!nonGrades.length){ onClose(); return null; }
+  return (
+    <>
+      <FireworksCanvas intensity={0.9}/>
+      <div onClick={close} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:24,cursor:"pointer",
+        opacity:phase===0?0:phase===2?0:1,transition:"opacity 0.4s"}}>
+        <div onClick={e=>e.stopPropagation()} style={{
+          background:"linear-gradient(160deg,#0e0e16,#161020)",
+          border:`1px solid ${C.yellowL}44`,
+          borderRadius:10,
+          padding:"32px 28px",
+          maxWidth:480, width:"100%",
+          textAlign:"center",
+          boxShadow:`0 0 60px ${C.yellowL}22`,
+          transform:phase===1?"scale(1)":"scale(0.9)",
+          transition:"transform 0.4s cubic-bezier(0.34,1.56,0.64,1)",
+          cursor:"default",
+        }}>
+          <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:5,color:C.yellowL,textTransform:"uppercase",marginBottom:16}}>
+            🏅 Badge{nonGrades.length>1?"s":""} débloqué{nonGrades.length>1?"s":""}
+          </div>
+          {/* Grille badges */}
+          <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",marginBottom:20}}>
+            {nonGrades.map((b,i)=>(
+              <div key={b.id} style={{textAlign:"center",padding:"12px 14px",background:b.color+"18",border:`1px solid ${b.color}66`,borderRadius:8,
+                transform:"scale(1)",animation:`badge-pop 0.4s ease ${i*0.1}s both`}}>
+                <div style={{fontSize:30,marginBottom:6,filter:`drop-shadow(0 0 8px ${b.color})`}}>{b.icon}</div>
+                <div style={{fontFamily:"Oswald,sans-serif",fontSize:10,color:b.color,letterSpacing:1,textTransform:"uppercase",fontWeight:700}}>{b.name}</div>
+                <div style={{color:C.muted,fontSize:9,marginTop:3,lineHeight:1.3}}>{b.desc}</div>
+              </div>
+            ))}
+          </div>
+          {/* Citation */}
+          <div style={{background:"rgba(0,0,0,0.3)",border:`1px solid ${C.border}`,borderRadius:6,padding:"12px 16px",marginBottom:20}}>
+            <p style={{color:C.text2,fontSize:13,lineHeight:1.7,margin:0,fontStyle:"italic"}}>« {quote} »</p>
+            <div style={{color:C.muted,fontSize:11,marginTop:8}}>— Le Grand Chef des SPV</div>
+          </div>
+          <button onClick={close} style={{background:C.yellowL,color:"#000",border:"none",borderRadius:4,padding:"10px 24px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:13,letterSpacing:1,textTransform:"uppercase"}}>
+            CONTINUER →
+          </button>
+        </div>
+      </div>
+      <style>{`@keyframes badge-pop{from{opacity:0;transform:scale(0.5)}to{opacity:1;transform:scale(1)}}`}</style>
+    </>
+  );
+}
 function QForm({initial,cats,qs,onSave,onCancel,saving,saveErr}) {
   const [q,setQ]=useState(initial);
   const valid=q.text?.trim()&&q.catId&&q.opts?.every(o=>o?.trim());
@@ -588,7 +891,9 @@ export default function App() {
   const timerRef                 = useRef(null);
   const globalTimerRef           = useRef(null);
 
-  const [newBadges,setNewBadges] = useState([]);
+  const [newBadges,setNewBadges]     = useState([]);
+  const [gradeUpModal,setGradeUpModal] = useState(null); // grade object
+  const [badgeModal,setBadgeModal]     = useState(false);
 
   // ── BOOT ─────────────────────────────────────────────────────
   useEffect(()=>{
@@ -812,11 +1117,18 @@ export default function App() {
       color:examMode==="all"?"#e8392a":examCat?.color,
       score:sc,total,pct
     });
-    const oldBadges=getUnlocked(myResults,cats).map(b=>b.id);
-    const newRes=[...myResults,{score:sc,total,pct,cat_id:examCat?.id}];
-    const newUnlocked=getUnlocked(newRes,cats).filter(b=>!oldBadges.includes(b.id));
+    const oldBadges = getUnlocked(myResults,cats).map(b=>b.id);
+    const newRes    = [...myResults,{score:sc,total,pct,cat_id:examCat?.id,created_at:new Date().toISOString()}];
+    const newUnlocked = getUnlocked(newRes,cats).filter(b=>!oldBadges.includes(b.id));
+    // Détecter promotion de grade (prendre le plus élevé)
+    const newGrades = newUnlocked.filter(b=>b.grade);
+    const topGrade  = newGrades.length ? newGrades[newGrades.length-1] : null;
+    const newNonGrades = newUnlocked.filter(b=>!b.grade);
     setNewBadges(newUnlocked);
     await loadMyResults(user.id);
+    // Afficher d'abord la promotion de grade, puis les badges
+    if(topGrade)  setGradeUpModal(topGrade);
+    else if(newNonGrades.length) setBadgeModal(true);
     setPage("results");
   },[answersRef,examList,examMode,examCat,wrongIds,user,pseudo,myResults,cats]);
 
@@ -1909,5 +2221,19 @@ export default function App() {
     );
   }
 
-  return null;
+  // ── MODALS GLOBAUX (hors pages) ────────────────────────────────
+  const nonGradeNewBadges = newBadges.filter(b=>!b.grade);
+  return (
+    <>
+      {gradeUpModal&&(
+        <GradeUpModal grade={gradeUpModal} pseudo={pseudo} onClose={()=>{
+          setGradeUpModal(null);
+          if(nonGradeNewBadges.length) setBadgeModal(true);
+        }}/>
+      )}
+      {!gradeUpModal&&badgeModal&&nonGradeNewBadges.length>0&&(
+        <BadgesUnlockModal badges={nonGradeNewBadges} onClose={()=>setBadgeModal(false)}/>
+      )}
+    </>
+  );
 }
