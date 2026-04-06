@@ -873,20 +873,6 @@ export default function App() {
   // Admin pending questions
   const [pendingQs,setPendingQs]   = useState([]);
 
-  const [cats,setCats]           = useState([]);
-  const [qs,setQs]               = useState([]);
-  const [docs,setDocs]           = useState([]);
-  const [myResults,setMyResults] = useState([]);
-  const [allResults,setAllResults] = useState([]);
-  const [wrongIds,setWrongIds]   = useState(new Set());
-
-  const [authMode,setAuthMode]   = useState("login");
-  const [aEmail,setAEmail]       = useState("");
-  const [aPw,setAPw]             = useState("");
-  const [aPseudo,setAPseudo]     = useState("");
-  const [aErr,setAErr]           = useState("");
-  const [aBusy,setABusy]         = useState(false);
-
   const [adminTab,setAdminTab]       = useState("qs");
   const [editQ,setEditQ]             = useState(null);
   const [editCat,setEditCat]         = useState(null);
