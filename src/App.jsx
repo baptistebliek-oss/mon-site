@@ -874,19 +874,28 @@ export default function App() {
   const [pendingQs,setPendingQs]   = useState([]);
 
   // Formateur session form & question form (hooks au niveau racine — règle React)
-  const [sf,setSf]   = useState({title:"",description:"",cat_ids:[],max_questions:20});
+  const [sf,setSf]   = useState({title:"",description:"",cat_ids:[],max_questions:20,timer_minutes:0,is_live:false});
   const [pqf,setPqf] = useState({catId:"",text:"",opts:["","","",""],correct:0,expl:""});
-  const [qrFullscreen,setQrFullscreen] = useState(null); // session object
-  const [sessionQs,setSessionQs]       = useState({}); // { sessionId: [questions] }
+  const [qrFullscreen,setQrFullscreen] = useState(null);
+  const [sessionQs,setSessionQs]       = useState({});
   const [editSessionQ,setEditSessionQ] = useState(null);
   const [sqf,setSqf] = useState({text:"",opts:["","","",""],correct:0,expl:""});
   const [sqSaving,setSqSaving] = useState(false);
-  // Session detail (gestion questions)
   const [currentSession,setCurrentSession] = useState(null);
   const [sessionSelectedIds,setSessionSelectedIds] = useState(new Set());
   const [sqSearch,setSqSearch]     = useState("");
   const [sqCatFilter,setSqCatFilter] = useState("all");
   const [sqSavingIds,setSqSavingIds] = useState(false);
+  // Live control (formateur)
+  const [liveSession,setLiveSession]     = useState(null); // session en cours de contrôle
+  const [waitroom,setWaitroomP]          = useState([]);   // participants en salle d'attente
+  const livePollerRef                    = useRef(null);
+  // Public session - timer + live
+  const [pubTimerLeft,setPubTimerLeft]   = useState(null);
+  const [pubPhase,setPubPhase]           = useState("entry"); // "entry"|"waiting"|"exam"|"done"
+  const pubTimerRef                      = useRef(null);
+  const pubPollRef                       = useRef(null);
+  const [waitroomList,setWaitroomList]   = useState([]);
 
   const [adminTab,setAdminTab]       = useState("qs");
   const [editQ,setEditQ]             = useState(null);
@@ -1062,7 +1071,7 @@ export default function App() {
   };
   const saveSession=async(data)=>{
     setFSaving(true);setFErr("");
-    const payload={formateur_id:user.id,formateur_name:pseudo,title:data.title,description:data.description||"",cat_ids:data.cat_ids||[],max_questions:data.max_questions||20,is_active:true};
+    const payload={formateur_id:user.id,formateur_name:pseudo,title:data.title,description:data.description||"",cat_ids:data.cat_ids||[],max_questions:data.max_questions||20,timer_minutes:data.timer_minutes||0,is_live:data.is_live||false,live_status:"waiting",is_active:true};
     if(mySessions.some(s=>s.id===data.id)){
       const {error}=await sb.from("sessions").update(payload).eq("id",data.id);
       if(!error){await loadMySessions();setEditSession(null);}else setFErr(error.message);
@@ -1177,6 +1186,42 @@ export default function App() {
       a.download = `QR-${session.title.replace(/\s+/g,"-")}.png`;
       a.click();
     } catch { window.open(url,"_blank"); }
+  };
+
+  // ── LIVE CONTROL (formateur) ─────────────────────────────────
+  const openLiveControl = async (s) => {
+    setLiveSession(s);
+    setPage("live-control");
+    await pollWaitroom(s.id);
+    // Poller toutes les 3s
+    livePollerRef.current = setInterval(()=>pollWaitroom(s.id), 3000);
+  };
+  const closeLiveControl = () => {
+    clearInterval(livePollerRef.current);
+    setLiveSession(null);
+    setPage("formateur");
+    setFTab("sessions");
+  };
+  const pollWaitroom = async (sessionId) => {
+    const {data} = await sb.from("session_waitroom").select("*")
+      .eq("session_id",sessionId).order("joined_at");
+    if(data) setWaitroomP(data);
+  };
+  const launchLive = async () => {
+    await sb.from("sessions").update({live_status:"active"}).eq("id",liveSession.id);
+    setLiveSession(s=>({...s,live_status:"active"}));
+  };
+  const endLive = async () => {
+    await sb.from("sessions").update({live_status:"ended"}).eq("id",liveSession.id);
+    // Nettoyer la salle d'attente
+    await sb.from("session_waitroom").delete().eq("session_id",liveSession.id);
+    setLiveSession(s=>({...s,live_status:"ended"}));
+  };
+  const resetLive = async () => {
+    await sb.from("sessions").update({live_status:"waiting"}).eq("id",liveSession.id);
+    await sb.from("session_waitroom").delete().eq("session_id",liveSession.id);
+    setLiveSession(s=>({...s,live_status:"waiting"}));
+    setWaitroomP([]);
   };
 
   // ── AUTH ─────────────────────────────────────────────────────
@@ -2511,7 +2556,7 @@ export default function App() {
             <div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
                 <h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Mes sessions ({mySessions.length})</h2>
-                <Btn onClick={async()=>{await loadMySessions();setSf({title:"",description:"",cat_ids:[],max_questions:20});setEditSession("new");}} sm color={C.purple}>+ Créer une session</Btn>
+                <Btn onClick={async()=>{await loadMySessions();setSf({title:"",description:"",cat_ids:[],max_questions:20,timer_minutes:0,is_live:false});setEditSession("new");}} sm color={C.purple}>+ Créer une session</Btn>
               </div>
               {fErr&&<ErrBox msg={fErr}/>}
 
@@ -2532,8 +2577,30 @@ export default function App() {
                       </div>
                     </div>
                     <div><FL>Nombre de questions max</FL>
-                      <div style={{display:"flex",gap:8}}>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                         {[10,20,30,40].map(n=><button key={n} onClick={()=>setSf(x=>({...x,max_questions:n}))} style={{background:sf.max_questions===n?C.purple:"transparent",color:sf.max_questions===n?"#fff":C.muted,border:`1px solid ${sf.max_questions===n?C.purple:C.border2}`,borderRadius:4,padding:"7px 16px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:15}}>{n}</button>)}
+                      </div>
+                    </div>
+                    <div><FL>Durée maximale (minutes) — 0 = pas de limite</FL>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                        {[0,10,15,20,30,45,60].map(n=>(
+                          <button key={n} onClick={()=>setSf(x=>({...x,timer_minutes:n}))} style={{background:sf.timer_minutes===n?C.yellowL:"transparent",color:sf.timer_minutes===n?"#000":C.muted,border:`1px solid ${sf.timer_minutes===n?C.yellowL:C.border2}`,borderRadius:4,padding:"7px 14px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:14}}>
+                            {n===0?"∞":n+"min"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <FL>Mode de démarrage</FL>
+                      <div style={{display:"flex",gap:10}}>
+                        <button onClick={()=>setSf(x=>({...x,is_live:false}))} style={{flex:1,background:!sf.is_live?C.blueL+"22":"transparent",color:!sf.is_live?C.blueL:C.muted,border:`1px solid ${!sf.is_live?C.blueL:C.border2}`,borderRadius:4,padding:"10px 14px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:13,textAlign:"left"}}>
+                          <div>🔗 Accès libre</div>
+                          <div style={{fontWeight:400,fontSize:11,marginTop:3,color:C.muted}}>Les participants commencent dès qu'ils scannent le QR</div>
+                        </button>
+                        <button onClick={()=>setSf(x=>({...x,is_live:true}))} style={{flex:1,background:sf.is_live?C.red+"22":"transparent",color:sf.is_live?C.red:C.muted,border:`1px solid ${sf.is_live?C.red:C.border2}`,borderRadius:4,padding:"10px 14px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:13,textAlign:"left"}}>
+                          <div>⚡ Mode Live</div>
+                          <div style={{fontWeight:400,fontSize:11,marginTop:3,color:C.muted}}>Salle d'attente — vous décidez du départ</div>
+                        </button>
                       </div>
                     </div>
                     <div style={{display:"flex",gap:10}}>
@@ -2562,6 +2629,8 @@ export default function App() {
                             {catNames.length>0?catNames.map(n=>{const cat=cats.find(c=>c.name===n);return <span key={n} style={{fontSize:11,color:cat?.color||C.muted,background:(cat?.color||C.muted)+"18",borderRadius:20,padding:"1px 9px",fontWeight:600}}>{n}</span>;}):
                               <span style={{fontSize:11,color:C.muted}}>Toutes catégories</span>}
                             <span style={{fontSize:11,color:C.muted}}>· {s.max_questions} questions max</span>
+                            {s.timer_minutes>0&&<span style={{fontSize:11,color:C.yellowL,fontWeight:600}}>⏱ {s.timer_minutes} min</span>}
+                            {s.is_live&&<span style={{fontSize:11,color:C.red,fontWeight:700,background:C.red+"18",borderRadius:20,padding:"1px 9px"}}>⚡ Mode Live — {s.live_status==="waiting"?"En attente":s.live_status==="active"?"En cours":"Terminé"}</span>}
                           </div>
                           {/* Lien */}
                           <div style={{background:C.surf,border:`1px solid ${C.border2}`,borderRadius:4,padding:"6px 10px",display:"flex",alignItems:"center",gap:8}}>
@@ -2585,8 +2654,9 @@ export default function App() {
                           <button onClick={()=>openSessionDetail(s)} style={{background:C.purple+"22",border:`1px solid ${C.purple}44`,color:C.purpleL,borderRadius:4,padding:"6px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>
                             📝 Gérer les questions ({(s.question_ids||[]).length} DB + {(sessionQs[s.id]||[]).length} perso)
                           </button>
+                          {s.is_live&&<button onClick={()=>openLiveControl(s)} style={{background:C.red+"22",border:`1px solid ${C.red}44`,color:C.red,borderRadius:4,padding:"6px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>⚡ Contrôle Live</button>}
                           <button onClick={async()=>{ await loadSessionResults(s.id); }} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>📊 Résultats</button>
-                          <button onClick={()=>{setSf({title:s.title,description:s.description||"",cat_ids:s.cat_ids||[],max_questions:s.max_questions});setEditSession(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Modifier</button>
+                          <button onClick={()=>{setSf({title:s.title,description:s.description||"",cat_ids:s.cat_ids||[],max_questions:s.max_questions,timer_minutes:s.timer_minutes||0,is_live:s.is_live||false});setEditSession(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Modifier</button>
                           <button onClick={async()=>{if(window.confirm("Supprimer cette session ?"))await sb.from("sessions").delete().eq("id",s.id).then(()=>loadMySessions());}} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
                         </div>
                         {res&&(
@@ -2829,78 +2899,234 @@ export default function App() {
     );
   }
 
+  // ── PAGE CONTRÔLE LIVE (formateur) ─────────────────────────
+  if(page==="live-control"&&liveSession){
+    const isWaiting = liveSession.live_status==="waiting";
+    const isActive  = liveSession.live_status==="active";
+    const isEnded   = liveSession.live_status==="ended";
+    return (
+      <Wrap>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={closeLiveControl} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:18,padding:0}}>←</button>
+            <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,textTransform:"uppercase"}}>⚡ Contrôle Live — {liveSession.title}</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:12,color:isWaiting?C.yellowL:isActive?C.greenL:C.muted,fontFamily:"Oswald,sans-serif",fontWeight:700,background:(isWaiting?C.yellowL:isActive?C.greenL:C.muted)+"18",border:`1px solid ${(isWaiting?C.yellowL:isActive?C.greenL:C.muted)}44`,borderRadius:20,padding:"3px 12px"}}>
+              {isWaiting?"⏳ En attente":isActive?"🟢 En cours":"⚫ Terminé"}
+            </span>
+          </div>
+        </div>
+
+        <div style={{maxWidth:800,margin:"0 auto",padding:"32px 24px"}}>
+          {/* Actions de contrôle */}
+          <div style={{display:"flex",gap:12,marginBottom:32,flexWrap:"wrap"}}>
+            {isWaiting&&(
+              <button onClick={launchLive} disabled={waitroom.length===0}
+                style={{background:waitroom.length>0?C.greenL:"#1e1e1e",color:waitroom.length>0?"#000":"#4a4a4a",border:"none",borderRadius:6,padding:"14px 28px",cursor:waitroom.length>0?"pointer":"default",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:16,letterSpacing:1,boxShadow:waitroom.length>0?`0 0 24px ${C.greenL}66`:"none",transition:"all 0.2s"}}>
+                🚀 LANCER LE QCM ({waitroom.length} participant{waitroom.length!==1?"s":""})
+              </button>
+            )}
+            {isActive&&(
+              <button onClick={endLive} style={{background:C.red,color:"#fff",border:"none",borderRadius:6,padding:"14px 28px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:16,letterSpacing:1}}>
+                ⏹ Terminer la session
+              </button>
+            )}
+            {(isActive||isEnded)&&(
+              <button onClick={resetLive} style={{background:C.card2,color:C.muted,border:`1px solid ${C.border2}`,borderRadius:6,padding:"14px 24px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14}}>
+                🔄 Réinitialiser
+              </button>
+            )}
+            <button onClick={()=>pollWaitroom(liveSession.id)} style={{background:C.card2,color:C.muted,border:`1px solid ${C.border2}`,borderRadius:4,padding:"10px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:600,fontSize:13}}>🔄 Actualiser</button>
+          </div>
+
+          {/* Salle d'attente */}
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:6,padding:"20px 22px"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+              <div style={{fontFamily:"Oswald,sans-serif",fontSize:14,letterSpacing:2,textTransform:"uppercase",color:C.muted}}>
+                Salle d'attente
+              </div>
+              <span style={{fontFamily:"Oswald,sans-serif",fontSize:22,fontWeight:700,color:C.text}}>{waitroom.length}</span>
+            </div>
+            {waitroom.length===0?(
+              <div style={{textAlign:"center",padding:"40px 0",color:C.muted}}>
+                <div style={{fontSize:40,marginBottom:12}}>👥</div>
+                <div>En attente de participants...</div>
+                <div style={{fontSize:12,marginTop:8}}>Partagez le QR code pour qu'ils rejoignent.</div>
+              </div>
+            ):(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
+                {waitroom.map((p,i)=>(
+                  <div key={p.id} style={{background:C.surf,border:`1px solid ${C.greenL}33`,borderRadius:4,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:C.greenL,flexShrink:0,boxShadow:`0 0 6px ${C.greenL}`}}/>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600}}>{p.participant_name}</div>
+                      <div style={{fontSize:10,color:C.muted}}>{timeAgo(p.joined_at)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {isWaiting&&waitroom.length===0&&(
+            <div style={{background:"#1a1208",border:`1px solid ${C.yellowL}33`,borderRadius:4,padding:"12px 16px",marginTop:16,fontSize:13,color:C.text2}}>
+              💡 Le bouton <strong style={{color:C.greenL}}>Lancer le QCM</strong> s'activera dès qu'au moins un participant aura rejoint la salle.
+            </div>
+          )}
+        </div>
+      </Wrap>
+    );
+  }
+
   // ── PAGE SESSION PUBLIQUE (QR code, sans compte) ────────────
   if(page==="pub-session"){
-    const startPubExam=async()=>{
-      if(!pubName.trim()||!pubSession) return;
-      // 1. Questions de la DB sélectionnées par le formateur
-      const selectedIds = pubSession.question_ids||[];
-      let dbPool = [];
-      if(selectedIds.length>0){
-        dbPool = qs.filter(q=>selectedIds.includes(q.id));
-      } else {
-        // Fallback : toutes questions des catégories de la session
-        const catIds = pubSession.cat_ids||[];
-        dbPool = catIds.length>0 ? qs.filter(q=>catIds.includes(q.catId)) : qs;
-      }
-      // 2. Questions personnalisées créées par le formateur pour cette session
-      const {data:sqData} = await sb.from("pending_questions")
-        .select("*").eq("session_id",pubSession.id);
-      const customPool = (sqData||[]).map(q=>({
-        id:q.id, text:q.text, opts:q.options, correct:q.correct_index, expl:q.explanation||"", catId:null
-      }));
-      const pool = [...dbPool, ...customPool];
-      if(!pool.length){ alert("Aucune question disponible pour cette session."); return; }
-      const shuffled = pool.sort(()=>Math.random()-0.5)
-        .slice(0, pubSession.max_questions||20)
-        .map(q=>{
-          const idxs=[0,1,2,3].sort(()=>Math.random()-0.5);
-          return {...q, opts:idxs.map(i=>q.opts[i]), correct:idxs.indexOf(q.correct)};
-        });
-      pubAnswers.current=[];
-      setPubExamList(shuffled);setPubIdx(0);setPubPicked(null);setPubShown(false);setPubLog([]);setPubDone(false);
+    const timerMinutes = pubSession?.timer_minutes||0;
+    const isLive = pubSession?.is_live||false;
+
+    const buildPool = async () => {
+      const selIds = pubSession.question_ids||[];
+      let dbPool = selIds.length>0
+        ? qs.filter(q=>selIds.includes(q.id))
+        : (pubSession.cat_ids||[]).length>0 ? qs.filter(q=>(pubSession.cat_ids||[]).includes(q.catId)) : qs;
+      const {data:sqData} = await sb.from("pending_questions").select("*").eq("session_id",pubSession.id);
+      const custom = (sqData||[]).map(q=>({id:q.id,text:q.text,opts:q.options,correct:q.correct_index,expl:q.explanation||"",catId:null}));
+      const pool = [...dbPool,...custom];
+      return pool.sort(()=>Math.random()-0.5).slice(0,pubSession.max_questions||20).map(q=>{
+        const ix=[0,1,2,3].sort(()=>Math.random()-0.5);
+        return {...q,opts:ix.map(i=>q.opts[i]),correct:ix.indexOf(q.correct)};
+      });
     };
+
+    const startTimer = () => {
+      if(timerMinutes<=0) return;
+      setPubTimerLeft(timerMinutes*60);
+      clearInterval(pubTimerRef.current);
+      pubTimerRef.current = setInterval(()=>{
+        setPubTimerLeft(t=>{ if(t<=1){ clearInterval(pubTimerRef.current); autoFinish(); return 0; } return t-1; });
+      },1000);
+    };
+
+    const autoFinish = async () => {
+      clearInterval(pubTimerRef.current); clearInterval(pubPollRef.current);
+      const answers=pubAnswers.current;
+      if(answers.length>0){
+        const sc=answers.filter(x=>x.correct).length;
+        await sb.from("session_results").insert({session_id:pubSession.id,participant_name:pubName,score:sc,total:pubExamList.length,pct:Math.round((sc/pubExamList.length)*100),answers});
+      }
+      setPubPhase("done");
+    };
+
+    const enterSession = async () => {
+      if(!pubName.trim()) return;
+      if(isLive){
+        // Rejoindre salle d'attente
+        await sb.from("session_waitroom").insert({session_id:pubSession.id,participant_name:pubName.trim()});
+        setPubPhase("waiting");
+        clearInterval(pubPollRef.current);
+        pubPollRef.current = setInterval(async()=>{
+          const {data:s} = await sb.from("sessions").select("live_status").eq("id",pubSession.id).single();
+          const {data:wr} = await sb.from("session_waitroom").select("*").eq("session_id",pubSession.id).order("joined_at");
+          if(wr) setWaitroomList(wr);
+          if(s?.live_status==="active"){
+            clearInterval(pubPollRef.current);
+            const list = await buildPool();
+            if(!list.length){setPubPhase("done");return;}
+            pubAnswers.current=[];
+            setPubExamList(list);setPubIdx(0);setPubPicked(null);setPubShown(false);setPubLog([]);
+            setPubPhase("exam"); startTimer();
+          }
+          if(s?.live_status==="ended"){clearInterval(pubPollRef.current);setPubPhase("done");}
+        },2000);
+      } else {
+        const list = await buildPool();
+        if(!list.length){alert("Aucune question disponible.");return;}
+        pubAnswers.current=[];
+        setPubExamList(list);setPubIdx(0);setPubPicked(null);setPubShown(false);setPubLog([]);
+        setPubPhase("exam"); startTimer();
+      }
+    };
+
     const validatePub=()=>{
       if(pubPicked===null) return;
       const ok=pubPicked===pubExamList[pubIdx].correct;
       pubAnswers.current=[...pubAnswers.current,{correct:ok}];
-      setPubLog([...pubAnswers.current]);setPubShown(true);
+      setPubLog([...pubAnswers.current]); setPubShown(true);
     };
     const nextPub=async()=>{
-      if(pubIdx+1>=pubExamList.length){ await submitPubExam(); }
-      else { setPubIdx(i=>i+1);setPubPicked(null);setPubShown(false); }
+      if(pubIdx+1>=pubExamList.length){
+        clearInterval(pubTimerRef.current);
+        const sc=pubAnswers.current.filter(x=>x.correct).length;
+        const tot=pubExamList.length;
+        await sb.from("session_results").insert({session_id:pubSession.id,participant_name:pubName,score:sc,total:tot,pct:Math.round((sc/tot)*100),answers:pubAnswers.current});
+        setPubPhase("done");
+      } else { setPubIdx(i=>i+1); setPubPicked(null); setPubShown(false); }
     };
 
-    // Chargement des questions si pas encore fait (fait au boot via loadData)
-
-    if(pubDone){
-      const sc=pubAnswers.current.filter(x=>x.correct).length;
-      const t=pubExamList.length;
-      const pct=Math.round((sc/t)*100);
+    // ── DONE ──
+    if(pubPhase==="done"){
+      const ans=pubAnswers.current; const sc=ans.filter(x=>x.correct).length; const tot=pubExamList.length||1;
+      const pct=Math.round((sc/tot)*100);
       return (
         <Wrap>
-          <div style={{maxWidth:560,margin:"0 auto",padding:"60px 24px",textAlign:"center"}}>
+          <div style={{maxWidth:520,margin:"0 auto",padding:"60px 24px",textAlign:"center"}}>
             <div style={{fontSize:50,marginBottom:12}}>{pct>=70?"🎉":"💪"}</div>
             <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(52px,14vw,80px)",fontWeight:700,color:pct2col(pct),lineHeight:1}}>{pct}%</div>
-            <div style={{color:C.text2,fontSize:16,marginTop:8}}>{sc} / {t} bonnes réponses</div>
+            <div style={{color:C.text2,fontSize:16,marginTop:8}}>{sc} / {tot} bonnes réponses</div>
             <div style={{fontFamily:"Oswald,sans-serif",fontSize:14,letterSpacing:4,textTransform:"uppercase",color:pct2col(pct),marginTop:10}}>{pct>=70?"Réussi":"À améliorer"}</div>
             <div style={{color:C.muted,fontSize:13,marginTop:14}}>Résultat enregistré pour <strong style={{color:C.text}}>{pubName}</strong></div>
-            <div style={{marginTop:32,color:C.muted,fontSize:13}}>Vous pouvez fermer cette fenêtre.</div>
+            <div style={{color:C.muted,fontSize:12,marginTop:28}}>Vous pouvez fermer cette fenêtre.</div>
           </div>
         </Wrap>
       );
     }
-    if(pubExamList.length>0){
+
+    // ── WAITING ──
+    if(pubPhase==="waiting"){
+      return (
+        <Wrap>
+          <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.red}`,borderRadius:8,padding:"40px 32px",width:"100%",maxWidth:400,textAlign:"center"}}>
+              <div style={{fontSize:44,marginBottom:16}}>⏳</div>
+              <div style={{fontFamily:"Oswald,sans-serif",fontSize:18,fontWeight:700,marginBottom:8}}>Salle d'attente</div>
+              <div style={{color:C.text2,fontSize:14,marginBottom:20}}>{pubSession?.title}</div>
+              <div style={{background:C.greenL+"14",border:`1px solid ${C.greenL}33`,borderRadius:6,padding:"10px 16px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:C.greenL,boxShadow:`0 0 6px ${C.greenL}`}}/>
+                <span style={{color:C.greenL,fontSize:13,fontWeight:600}}>Connecté en tant que <strong>{pubName}</strong></span>
+              </div>
+              {waitroomList.length>0&&(
+                <div style={{marginBottom:16}}>
+                  <div style={{color:C.muted,fontSize:12,marginBottom:8}}>{waitroomList.length} participant{waitroomList.length!==1?"s":""} dans la salle</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"center"}}>
+                    {waitroomList.map(p=><span key={p.id} style={{background:C.surf,border:`1px solid ${C.border2}`,borderRadius:20,padding:"3px 12px",fontSize:12,color:p.participant_name===pubName?C.greenL:C.text2,fontWeight:p.participant_name===pubName?700:400}}>{p.participant_name}</span>)}
+                  </div>
+                </div>
+              )}
+              <div style={{color:C.muted,fontSize:13}}>En attente du formateur...</div>
+              <div style={{width:40,height:3,background:`linear-gradient(90deg,${C.purple},${C.red})`,borderRadius:99,margin:"16px auto 0"}}/>
+            </div>
+          </div>
+        </Wrap>
+      );
+    }
+
+    // ── EXAM ──
+    if(pubPhase==="exam"&&pubExamList.length>0){
       const q=pubExamList[pubIdx];
       const isCorrect=pubPicked===q.correct;
+      const timerPct=timerMinutes>0&&pubTimerLeft!==null?(pubTimerLeft/(timerMinutes*60))*100:100;
+      const timerCol=!pubTimerLeft||pubTimerLeft>60?C.greenL:pubTimerLeft>20?C.orange:C.red;
       return (
         <Wrap>
           <div style={{height:4,background:C.border}}><div style={{height:"100%",background:C.purple,width:`${(pubIdx/pubExamList.length)*100}%`,transition:"width 0.4s"}}/></div>
+          {timerMinutes>0&&<div style={{height:3,background:C.border}}><div style={{height:"100%",background:timerCol,width:`${timerPct}%`,transition:"width 1s linear"}}/></div>}
           <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,color:C.purple}}>{pubSession.title}</span>
-            <span style={{fontFamily:"Oswald,sans-serif",color:C.muted,fontSize:13}}>{pubIdx+1} / {pubExamList.length}</span>
+            <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,color:C.purple}}>{pubSession?.title}</span>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              {timerMinutes>0&&pubTimerLeft!==null&&<span style={{fontFamily:"Oswald,sans-serif",fontSize:14,fontWeight:700,color:timerCol}}>{fmtTimer(pubTimerLeft)}</span>}
+              <span style={{fontFamily:"Oswald,sans-serif",color:C.muted,fontSize:13}}>{pubIdx+1}/{pubExamList.length}</span>
+            </div>
           </div>
-          {/* Progress live */}
           {pubLog.length>0&&(
             <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"8px 24px",display:"flex",alignItems:"center",gap:14}}>
               <div style={{flex:1,background:C.bg,borderRadius:99,height:7,overflow:"hidden",position:"relative"}}>
@@ -2933,23 +3159,29 @@ export default function App() {
         </Wrap>
       );
     }
-    // Écran d'accueil session
+
+    // ── ENTRY ──
     return (
       <Wrap>
         <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.1) 0%, transparent 60%)`}}>
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.purple}`,borderRadius:8,padding:"36px 30px",width:"100%",maxWidth:380,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
-            <div style={{fontSize:48,marginBottom:14,filter:"drop-shadow(0 0 20px rgba(124,58,237,0.5))"}}>📋</div>
+            <div style={{fontSize:48,marginBottom:14,filter:"drop-shadow(0 0 20px rgba(124,58,237,0.5))"}}>{isLive?"⚡":"📋"}</div>
             <div style={{fontFamily:"Oswald,sans-serif",fontSize:20,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.text,marginBottom:6}}>{pubSession?.title}</div>
-            {pubSession?.description&&<div style={{color:C.muted,fontSize:13,marginBottom:20,lineHeight:1.6}}>{pubSession.description}</div>}
-            <div style={{color:C.muted,fontSize:12,marginBottom:24}}>
-              {pubSession?.max_questions} questions · Résultats transmis au formateur
+            {pubSession?.description&&<div style={{color:C.muted,fontSize:13,marginBottom:14,lineHeight:1.6}}>{pubSession.description}</div>}
+            <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:20,flexWrap:"wrap"}}>
+              <span style={{fontSize:12,color:C.muted,background:C.surf,borderRadius:20,padding:"3px 12px"}}>{pubSession?.max_questions} questions</span>
+              {timerMinutes>0&&<span style={{fontSize:12,color:C.yellowL,background:C.yellowL+"18",borderRadius:20,padding:"3px 12px",fontWeight:600}}>⏱ {timerMinutes} min</span>}
+              {isLive&&<span style={{fontSize:12,color:C.red,background:C.red+"18",borderRadius:20,padding:"3px 12px",fontWeight:600}}>⚡ Mode Live</span>}
             </div>
             <div style={{textAlign:"left",marginBottom:20}}>
               <FL>Votre prénom et nom *</FL>
-              <Field value={pubName} onChange={e=>setPubName(e.target.value)} placeholder="Ex : Jean Dupont" onKeyDown={e=>e.key==="Enter"&&startPubExam()} autoFocus/>
+              <Field value={pubName} onChange={e=>setPubName(e.target.value)} placeholder="Ex : Jean Dupont" onKeyDown={e=>e.key==="Enter"&&enterSession()} autoFocus/>
             </div>
-            <Btn onClick={startPubExam} disabled={!pubName.trim()||!qs.length} full color={C.purple}>COMMENCER →</Btn>
-            {!qs.length&&<div style={{color:C.muted,fontSize:12,marginTop:10}}>Chargement des questions...</div>}
+            <Btn onClick={enterSession} disabled={!pubName.trim()||!qs.length} full color={C.purple}>
+              {isLive?"REJOINDRE LA SALLE D'ATTENTE →":"COMMENCER →"}
+            </Btn>
+            {!qs.length&&<div style={{color:C.muted,fontSize:12,marginTop:10}}>Chargement...</div>}
+            {isLive&&<div style={{color:C.muted,fontSize:12,marginTop:10}}>Le formateur lancera le QCM au moment choisi.</div>}
           </div>
         </div>
       </Wrap>
