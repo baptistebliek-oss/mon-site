@@ -954,10 +954,16 @@ export default function App() {
     const sessionId = params.get("session");
     if(sessionId){
       sb.from("sessions").select("*").eq("id",sessionId).eq("is_active",true).single()
-        .then(async({data})=>{
-          if(data){
+        .then(async({data,error})=>{
+          if(data&&!error){
             setPubSession(data);
-            await loadData(); // charger les questions pour la session
+            // Charger les questions en mode anonyme (pas besoin d'auth)
+            const [cR,qR] = await Promise.all([
+              sb.from("categories").select("*"),
+              sb.from("questions").select("*"),
+            ]);
+            if(cR.data) setCats(cR.data.map(c=>({id:c.id,name:c.name,desc:c.description,color:c.color})));
+            if(qR.data) setQs(qR.data.map(q=>({id:q.id,catId:q.cat_id,text:q.text,opts:q.options,correct:q.correct_index,expl:q.explanation})));
             setPage("pub-session");
           } else setPage("auth");
         })
@@ -2985,10 +2991,17 @@ export default function App() {
     const isLive = pubSession?.is_live||false;
 
     const buildPool = async () => {
+      // Si les questions ne sont pas encore en mémoire, les charger directement
+      let allQs = qs;
+      if(!allQs.length){
+        const {data} = await sb.from("questions").select("*");
+        allQs = (data||[]).map(q=>({id:q.id,catId:q.cat_id,text:q.text,opts:q.options,correct:q.correct_index,expl:q.explanation||""}));
+        if(allQs.length) setQs(allQs);
+      }
       const selIds = pubSession.question_ids||[];
       let dbPool = selIds.length>0
-        ? qs.filter(q=>selIds.includes(q.id))
-        : (pubSession.cat_ids||[]).length>0 ? qs.filter(q=>(pubSession.cat_ids||[]).includes(q.catId)) : qs;
+        ? allQs.filter(q=>selIds.includes(q.id))
+        : (pubSession.cat_ids||[]).length>0 ? allQs.filter(q=>(pubSession.cat_ids||[]).includes(q.catId)) : allQs;
       const {data:sqData} = await sb.from("pending_questions").select("*").eq("session_id",pubSession.id);
       const custom = (sqData||[]).map(q=>({id:q.id,text:q.text,opts:q.options,correct:q.correct_index,expl:q.explanation||"",catId:null}));
       const pool = [...dbPool,...custom];
@@ -3177,10 +3190,10 @@ export default function App() {
               <FL>Votre prénom et nom *</FL>
               <Field value={pubName} onChange={e=>setPubName(e.target.value)} placeholder="Ex : Jean Dupont" onKeyDown={e=>e.key==="Enter"&&enterSession()} autoFocus/>
             </div>
-            <Btn onClick={enterSession} disabled={!pubName.trim()||!qs.length} full color={C.purple}>
+            <Btn onClick={enterSession} disabled={!pubName.trim()} full color={C.purple}>
               {isLive?"REJOINDRE LA SALLE D'ATTENTE →":"COMMENCER →"}
             </Btn>
-            {!qs.length&&<div style={{color:C.muted,fontSize:12,marginTop:10}}>Chargement...</div>}
+            {!qs.length&&<div style={{color:C.orange,fontSize:12,marginTop:10}}>⏳ Chargement des questions en cours...</div>}
             {isLive&&<div style={{color:C.muted,fontSize:12,marginTop:10}}>Le formateur lancera le QCM au moment choisi.</div>}
           </div>
         </div>
