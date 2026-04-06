@@ -878,9 +878,15 @@ export default function App() {
   const [pqf,setPqf] = useState({catId:"",text:"",opts:["","","",""],correct:0,expl:""});
   const [qrFullscreen,setQrFullscreen] = useState(null); // session object
   const [sessionQs,setSessionQs]       = useState({}); // { sessionId: [questions] }
-  const [editSessionQ,setEditSessionQ] = useState(null); // null | "new" | question object
-  const [sqf,setSqf] = useState({text:"",opts:["","","",""],correct:0,expl:""}); // session question form
+  const [editSessionQ,setEditSessionQ] = useState(null);
+  const [sqf,setSqf] = useState({text:"",opts:["","","",""],correct:0,expl:""});
   const [sqSaving,setSqSaving] = useState(false);
+  // Session detail (gestion questions)
+  const [currentSession,setCurrentSession] = useState(null);
+  const [sessionSelectedIds,setSessionSelectedIds] = useState(new Set());
+  const [sqSearch,setSqSearch]     = useState("");
+  const [sqCatFilter,setSqCatFilter] = useState("all");
+  const [sqSavingIds,setSqSavingIds] = useState(false);
 
   const [adminTab,setAdminTab]       = useState("qs");
   const [editQ,setEditQ]             = useState(null);
@@ -1097,41 +1103,66 @@ export default function App() {
     setPubDone(true);
   };
 
-  // ── SESSION QUESTIONS (questions propres à une session) ──────
+  // ── SESSION QUESTIONS ────────────────────────────────────────
   const loadSessionQs = async (sessionId) => {
     const {data} = await sb.from("pending_questions").select("*")
       .eq("session_id", sessionId).order("created_at");
-    if(data) setSessionQs(prev=>({...prev,[sessionId]:data.map(q=>({
+    const mapped = (data||[]).map(q=>({
       id:q.id, text:q.text, opts:q.options, correct:q.correct_index, expl:q.explanation||""
-    }))}));
-    return data||[];
+    }));
+    setSessionQs(prev=>({...prev,[sessionId]:mapped}));
+    return mapped;
   };
 
-  const saveSessionQ = async (sessionId) => {
+  const openSessionDetail = async (s) => {
+    setCurrentSession(s);
+    setSqSearch(""); setSqCatFilter("all"); setEditSessionQ(null);
+    setSqf({text:"",opts:["","","",""],correct:0,expl:""});
+    // Charger les IDs sélectionnés depuis la DB
+    const ids = new Set(s.question_ids||[]);
+    setSessionSelectedIds(ids);
+    // Charger les questions personnalisées
+    await loadSessionQs(s.id);
+    setPage("session-detail");
+  };
+
+  const toggleSessionQuestion = async (qId) => {
+    const newSet = new Set(sessionSelectedIds);
+    if(newSet.has(qId)) newSet.delete(qId); else newSet.add(qId);
+    setSessionSelectedIds(newSet);
+    // Sauvegarder immédiatement dans la DB
+    await sb.from("sessions").update({question_ids:[...newSet]}).eq("id",currentSession.id);
+    // Mettre à jour la session locale
+    setCurrentSession(s=>({...s,question_ids:[...newSet]}));
+    setMySessions(prev=>prev.map(s=>s.id===currentSession.id?{...s,question_ids:[...newSet]}:s));
+  };
+
+  const saveSessionQ = async () => {
     if(!sqf.text.trim()||!sqf.opts.every(o=>o.trim())) return;
     setSqSaving(true);
+    const isEdit = editSessionQ && editSessionQ!=="new";
     const payload = {
       formateur_id: user.id, formateur_name: pseudo,
-      session_id: sessionId,
-      cat_id: null, // question de session, pas de catégorie obligatoire
+      session_id: currentSession.id,
+      cat_id: null,
       text: sqf.text, options: sqf.opts,
       correct_index: sqf.correct, explanation: sqf.expl||"",
       status: "pending"
     };
-    if(editSessionQ && editSessionQ!=="new") {
-      await sb.from("pending_questions").update(payload).eq("id", editSessionQ.id);
+    if(isEdit) {
+      await sb.from("pending_questions").update(payload).eq("id",editSessionQ.id);
     } else {
       await sb.from("pending_questions").insert(payload);
     }
-    await loadSessionQs(sessionId);
+    await loadSessionQs(currentSession.id);
     setEditSessionQ(null);
     setSqf({text:"",opts:["","","",""],correct:0,expl:""});
     setSqSaving(false);
   };
 
-  const deleteSessionQ = async (qId, sessionId) => {
+  const deleteSessionQ = async (qId) => {
     await sb.from("pending_questions").delete().eq("id", qId);
-    await loadSessionQs(sessionId);
+    await loadSessionQs(currentSession.id);
   };
 
   // ── QR CODE DOWNLOAD ────────────────────────────────────────
@@ -1145,9 +1176,7 @@ export default function App() {
       a.href = URL.createObjectURL(blob);
       a.download = `QR-${session.title.replace(/\s+/g,"-")}.png`;
       a.click();
-    } catch {
-      window.open(url,"_blank");
-    }
+    } catch { window.open(url,"_blank"); }
   };
 
   // ── AUTH ─────────────────────────────────────────────────────
@@ -2550,75 +2579,18 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-                      {/* Actions + questions de session + résultats */}
+                      {/* Actions + résultats */}
                       <div style={{borderTop:`1px solid ${C.border}`,padding:"12px 20px"}}>
-                        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:10}}>
-                          <button onClick={async()=>{await loadSessionResults(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>📊 Résultats</button>
-                          <button onClick={async()=>{await loadSessionQs(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>📝 Questions ({(sessionQs[s.id]||[]).length})</button>
+                        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:res?10:0}}>
+                          <button onClick={()=>openSessionDetail(s)} style={{background:C.purple+"22",border:`1px solid ${C.purple}44`,color:C.purpleL,borderRadius:4,padding:"6px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>
+                            📝 Gérer les questions ({(s.question_ids||[]).length} DB + {(sessionQs[s.id]||[]).length} perso)
+                          </button>
+                          <button onClick={async()=>{ await loadSessionResults(s.id); }} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>📊 Résultats</button>
                           <button onClick={()=>{setSf({title:s.title,description:s.description||"",cat_ids:s.cat_ids||[],max_questions:s.max_questions});setEditSession(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Modifier</button>
-                          <button onClick={async()=>{if(window.confirm("Supprimer cette session ?"))await sb.from("sessions").delete().eq("id",s.id).then(()=>loadMySessions());}} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑 Supprimer</button>
+                          <button onClick={async()=>{if(window.confirm("Supprimer cette session ?"))await sb.from("sessions").delete().eq("id",s.id).then(()=>loadMySessions());}} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
                         </div>
-
-                        {/* Questions de la session */}
-                        {sessionQs[s.id]!==undefined&&(
-                          <div style={{marginBottom:10}}>
-                            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                              <span style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:2,textTransform:"uppercase",color:C.purple}}>📝 Questions propres à cette session</span>
-                              <button onClick={()=>{setSqf({text:"",opts:["","","",""],correct:0,expl:""});setEditSessionQ({sid:s.id,id:"new"});}} style={{background:C.purple+"22",border:`1px solid ${C.purple}44`,color:C.purpleL,borderRadius:4,padding:"4px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>+ Ajouter une question</button>
-                            </div>
-                            <div style={{background:"#0a0a14",border:`1px solid ${C.purple}22`,borderRadius:4,padding:"10px 14px",marginBottom:10,fontSize:12,color:C.muted,lineHeight:1.6}}>
-                              💡 Ces questions sont <strong style={{color:C.text}}>utilisées uniquement dans cette session</strong>. Elles sont automatiquement soumises à l'admin pour éventuelle intégration dans la base commune.
-                            </div>
-
-                            {/* Formulaire question de session */}
-                            {editSessionQ?.sid===s.id&&(
-                              <div style={{background:C.card,border:`1px solid ${C.purple}44`,borderRadius:6,padding:"16px 18px",marginBottom:10}}>
-                                <div style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,textTransform:"uppercase",color:C.purple,marginBottom:14}}>{editSessionQ.id==="new"?"Nouvelle question":"Modifier la question"}</div>
-                                <div style={{display:"flex",flexDirection:"column",gap:14}}>
-                                  <div><FL>Intitulé de la question *</FL><Field value={sqf.text} onChange={e=>setSqf(x=>({...x,text:e.target.value}))} placeholder="Saisissez votre question..." rows={2}/></div>
-                                  <div>
-                                    <FL>Options — cliquez la lettre pour la bonne réponse *</FL>
-                                    {sqf.opts.map((opt,i)=>(
-                                      <div key={i} style={{display:"flex",gap:10,marginBottom:8,alignItems:"center"}}>
-                                        <button onClick={()=>setSqf(x=>({...x,correct:i}))} style={{width:32,height:32,flexShrink:0,border:`2px solid ${sqf.correct===i?C.greenL:C.border2}`,borderRadius:4,background:sqf.correct===i?"#0a2214":"transparent",color:sqf.correct===i?C.greenL:C.muted,fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>{LABELS[i]}</button>
-                                        <input value={opt||""} onChange={e=>{const o=[...sqf.opts];o[i]=e.target.value;setSqf(x=>({...x,opts:o}));}} placeholder={`Réponse ${LABELS[i]}`} style={{flex:1,background:C.surf,border:`1px solid ${sqf.correct===i?"#1a4a28":C.border2}`,borderRadius:4,color:C.text,padding:"9px 12px",fontSize:13,fontFamily:"'Barlow',sans-serif",outline:"none"}}/>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div><FL>Explication (optionnel)</FL><Field value={sqf.expl||""} onChange={e=>setSqf(x=>({...x,expl:e.target.value}))} placeholder="Affichée après la réponse..." rows={2}/></div>
-                                  <div style={{display:"flex",gap:10}}>
-                                    <button onClick={async()=>{ if(!sqf.text.trim()||!sqf.opts.every(o=>o.trim()))return; await saveSessionQ(s.id); }} disabled={sqSaving||!sqf.text.trim()||!sqf.opts.every(o=>o.trim())} style={{background:sqSaving?C.faint:C.purple,color:"#fff",border:"none",borderRadius:4,padding:"9px 20px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:13}}>
-                                      {sqSaving?"Enregistrement...":"✓ Enregistrer"}
-                                    </button>
-                                    <Btn onClick={()=>setEditSessionQ(null)} ghost>Annuler</Btn>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Liste questions de session */}
-                            {sessionQs[s.id].length===0&&!editSessionQ?<div style={{color:C.muted,fontSize:13,textAlign:"center",padding:"16px 0"}}>Aucune question. Cliquez "+ Ajouter une question" pour en créer.</div>:(
-                              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                                {sessionQs[s.id].map((q,qi)=>(
-                                  <div key={q.id} style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:4,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                                    <div style={{flex:1,minWidth:0}}>
-                                      <div style={{fontSize:13,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{qi+1}. {q.text}</div>
-                                      <div style={{color:C.greenL,fontSize:11,marginTop:2}}>✓ {q.opts[q.correct]}</div>
-                                    </div>
-                                    <div style={{display:"flex",gap:6,flexShrink:0}}>
-                                      <button onClick={()=>{setSqf({text:q.text,opts:q.opts,correct:q.correct,expl:q.expl});setEditSessionQ({sid:s.id,id:q.id});}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"3px 9px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏</button>
-                                      <button onClick={()=>deleteSessionQ(q.id,s.id)} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"3px 8px",cursor:"pointer",fontSize:11}}>🗑</button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Résultats inline */}
                         {res&&(
-                          <div style={{marginTop:6}}>
+                          <div>
                             <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:8}}>{res.length} participant{res.length!==1?"s":""}</div>
                             {res.length===0?<div style={{color:C.muted,fontSize:13}}>Aucun participant pour le moment.</div>:(
                               <div style={{display:"flex",flexDirection:"column",gap:5}}>
@@ -2730,23 +2702,161 @@ export default function App() {
     );
   }
 
+  // ── PAGE GESTION QUESTIONS SESSION ─────────────────────────
+  if(page==="session-detail"&&currentSession){
+    const customQs = sessionQs[currentSession.id]||[];
+    const totalQs  = sessionSelectedIds.size + customQs.length;
+    // Filtre questions DB
+    const dbFiltered = qs
+      .filter(q=> sqCatFilter==="all"||q.catId===sqCatFilter)
+      .filter(q=> !sqSearch.trim()||q.text.toLowerCase().includes(sqSearch.toLowerCase()));
+
+    return (
+      <Wrap>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={()=>{setPage("formateur");setFTab("sessions");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:18,padding:0}}>←</button>
+            <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,textTransform:"uppercase",color:C.purpleL}}>{currentSession.title}</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{background:C.purple+"22",border:`1px solid ${C.purple}44`,borderRadius:20,padding:"4px 14px",fontFamily:"Oswald,sans-serif",fontSize:13,color:C.purpleL}}>
+              {totalQs} question{totalQs!==1?"s":""} dans la session
+            </div>
+          </div>
+        </div>
+
+        <div style={{maxWidth:960,margin:"0 auto",padding:"28px 24px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+
+            {/* ── COLONNE GAUCHE : Questions de la base ── */}
+            <div>
+              <div style={{fontFamily:"Oswald,sans-serif",fontSize:12,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:14}}>
+                📚 Questions de la base ({sessionSelectedIds.size} sélectionnées)
+              </div>
+              {/* Filtres */}
+              <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+                <div style={{position:"relative"}}>
+                  <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:C.muted,fontSize:13}}>🔍</span>
+                  <input value={sqSearch} onChange={e=>setSqSearch(e.target.value)} placeholder="Rechercher..." style={{width:"100%",background:C.surf,border:`1px solid ${C.border2}`,borderRadius:4,color:C.text,padding:"8px 12px 8px 32px",fontSize:13,fontFamily:"'Barlow',sans-serif",outline:"none",boxSizing:"border-box"}}/>
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <button onClick={()=>setSqCatFilter("all")} style={{background:sqCatFilter==="all"?C.text:"transparent",color:sqCatFilter==="all"?C.bg:C.muted,border:`1px solid ${sqCatFilter==="all"?C.text:C.border2}`,borderRadius:20,padding:"3px 12px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>Toutes</button>
+                  {cats.map(cat=><button key={cat.id} onClick={()=>setSqCatFilter(cat.id)} style={{background:sqCatFilter===cat.id?cat.color:"transparent",color:sqCatFilter===cat.id?"#fff":C.muted,border:`1px solid ${sqCatFilter===cat.id?cat.color:C.border2}`,borderRadius:20,padding:"3px 12px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>{cat.name}</button>)}
+                </div>
+              </div>
+              {/* Liste questions DB */}
+              <div style={{maxHeight:"60vh",overflowY:"auto",display:"flex",flexDirection:"column",gap:6,paddingRight:4}}>
+                {dbFiltered.length===0?<div style={{color:C.muted,fontSize:13,textAlign:"center",padding:"30px 0"}}>Aucune question trouvée.</div>:
+                  dbFiltered.map(q=>{
+                    const cat=cats.find(c=>c.id===q.catId);
+                    const sel=sessionSelectedIds.has(q.id);
+                    return (
+                      <div key={q.id} onClick={()=>toggleSessionQuestion(q.id)} style={{background:sel?C.purple+"14":C.card,border:`1px solid ${sel?C.purple+"66":C.border}`,borderRadius:4,padding:"10px 14px",cursor:"pointer",transition:"all 0.15s",display:"flex",alignItems:"flex-start",gap:10}}>
+                        <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${sel?C.purple:C.border2}`,background:sel?C.purple:"transparent",flexShrink:0,marginTop:2,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {sel&&<span style={{color:"#fff",fontSize:10,fontWeight:700}}>✓</span>}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:500,lineHeight:1.4,color:sel?C.text:C.text2}}>{q.text}</div>
+                          {cat&&<span style={{fontSize:10,color:cat.color,marginTop:3,display:"inline-block"}}>{cat.name}</span>}
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </div>
+
+            {/* ── COLONNE DROITE : Questions personnalisées ── */}
+            <div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                <div style={{fontFamily:"Oswald,sans-serif",fontSize:12,letterSpacing:3,textTransform:"uppercase",color:C.muted}}>
+                  ✏ Questions personnalisées ({customQs.length})
+                </div>
+                <button onClick={()=>{setSqf({text:"",opts:["","","",""],correct:0,expl:""});setEditSessionQ("new");}} style={{background:C.purple,color:"#fff",border:"none",borderRadius:4,padding:"5px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>+ Créer</button>
+              </div>
+
+              <div style={{background:"#0a0a14",border:`1px solid ${C.purple}22`,borderRadius:4,padding:"8px 12px",marginBottom:12,fontSize:12,color:C.muted,lineHeight:1.5}}>
+                💡 Soumises à l'admin pour intégration dans la base commune.
+              </div>
+
+              {/* Formulaire nouvelle question perso */}
+              {editSessionQ&&(
+                <div style={{background:C.card,border:`1px solid ${C.purple}44`,borderRadius:6,padding:"14px 16px",marginBottom:12}}>
+                  <div style={{fontFamily:"Oswald,sans-serif",fontSize:12,letterSpacing:2,textTransform:"uppercase",color:C.purple,marginBottom:12}}>{editSessionQ==="new"?"Nouvelle question":"Modifier"}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    <Field value={sqf.text} onChange={e=>setSqf(x=>({...x,text:e.target.value}))} placeholder="Intitulé de la question *" rows={2}/>
+                    {sqf.opts.map((opt,i)=>(
+                      <div key={i} style={{display:"flex",gap:8,alignItems:"center"}}>
+                        <button onClick={()=>setSqf(x=>({...x,correct:i}))} style={{width:28,height:28,flexShrink:0,border:`2px solid ${sqf.correct===i?C.greenL:C.border2}`,borderRadius:3,background:sqf.correct===i?"#0a2214":"transparent",color:sqf.correct===i?C.greenL:C.muted,fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:11,cursor:"pointer"}}>{LABELS[i]}</button>
+                        <input value={opt||""} onChange={e=>{const o=[...sqf.opts];o[i]=e.target.value;setSqf(x=>({...x,opts:o}));}} placeholder={`Réponse ${LABELS[i]}`} style={{flex:1,background:C.surf,border:`1px solid ${sqf.correct===i?"#1a4a28":C.border2}`,borderRadius:3,color:C.text,padding:"7px 10px",fontSize:12,fontFamily:"'Barlow',sans-serif",outline:"none"}}/>
+                      </div>
+                    ))}
+                    <Field value={sqf.expl||""} onChange={e=>setSqf(x=>({...x,expl:e.target.value}))} placeholder="Explication (optionnel)" rows={2}/>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={saveSessionQ} disabled={sqSaving||!sqf.text.trim()||!sqf.opts.every(o=>o.trim())} style={{background:sqSaving||!sqf.text.trim()?C.faint:C.purple,color:"#fff",border:"none",borderRadius:4,padding:"8px 18px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:12}}>
+                        {sqSaving?"Enregistrement...":"✓ Enregistrer"}
+                      </button>
+                      <button onClick={()=>setEditSessionQ(null)} style={{background:"transparent",border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"8px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif"}}>Annuler</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Liste questions perso */}
+              {customQs.length===0&&!editSessionQ?
+                <div style={{color:C.muted,fontSize:13,textAlign:"center",padding:"30px 0",border:`1px dashed ${C.border2}`,borderRadius:6}}>Créez vos propres questions pour cette session.</div>:
+                <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:"50vh",overflowY:"auto"}}>
+                  {customQs.map((q,i)=>(
+                    <div key={q.id} style={{background:C.card,border:`1px solid ${C.purple}33`,borderRadius:4,padding:"10px 14px"}}>
+                      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:500,lineHeight:1.4,marginBottom:4}}>{i+1}. {q.text}</div>
+                          <div style={{fontSize:11,color:C.greenL}}>✓ {q.opts[q.correct]}</div>
+                        </div>
+                        <div style={{display:"flex",gap:5,flexShrink:0}}>
+                          <button onClick={()=>{setSqf({text:q.text,opts:q.opts,correct:q.correct,expl:q.expl});setEditSessionQ(q);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:3,padding:"3px 8px",cursor:"pointer",fontSize:11}}>✏</button>
+                          <button onClick={()=>deleteSessionQ(q.id)} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:3,padding:"3px 7px",cursor:"pointer",fontSize:11}}>🗑</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </Wrap>
+    );
+  }
+
   // ── PAGE SESSION PUBLIQUE (QR code, sans compte) ────────────
   if(page==="pub-session"){
     const startPubExam=async()=>{
       if(!pubName.trim()||!pubSession) return;
-      const catIds=pubSession.cat_ids||[];
-      // Questions communes filtrées par catégorie
-      const commonPool=qs.filter(q=>catIds.length===0||catIds.includes(q.catId));
-      // Questions spécifiques à cette session (créées par le formateur)
-      const {data:sqData} = await sb.from("pending_questions").select("*").eq("session_id",pubSession.id);
-      const sessionPool=(sqData||[]).map(q=>({id:q.id,text:q.text,opts:q.options,correct:q.correct_index,expl:q.explanation||"",catId:null}));
-      // Mélanger les deux pools
-      const pool=[...commonPool,...sessionPool];
+      // 1. Questions de la DB sélectionnées par le formateur
+      const selectedIds = pubSession.question_ids||[];
+      let dbPool = [];
+      if(selectedIds.length>0){
+        dbPool = qs.filter(q=>selectedIds.includes(q.id));
+      } else {
+        // Fallback : toutes questions des catégories de la session
+        const catIds = pubSession.cat_ids||[];
+        dbPool = catIds.length>0 ? qs.filter(q=>catIds.includes(q.catId)) : qs;
+      }
+      // 2. Questions personnalisées créées par le formateur pour cette session
+      const {data:sqData} = await sb.from("pending_questions")
+        .select("*").eq("session_id",pubSession.id);
+      const customPool = (sqData||[]).map(q=>({
+        id:q.id, text:q.text, opts:q.options, correct:q.correct_index, expl:q.explanation||"", catId:null
+      }));
+      const pool = [...dbPool, ...customPool];
       if(!pool.length){ alert("Aucune question disponible pour cette session."); return; }
-      const shuffled=pool.sort(()=>Math.random()-0.5).slice(0,pubSession.max_questions||20).map(q=>{
-        const idxs=[0,1,2,3].sort(()=>Math.random()-0.5);
-        return {...q,opts:idxs.map(i=>q.opts[i]),correct:idxs.indexOf(q.correct)};
-      });
+      const shuffled = pool.sort(()=>Math.random()-0.5)
+        .slice(0, pubSession.max_questions||20)
+        .map(q=>{
+          const idxs=[0,1,2,3].sort(()=>Math.random()-0.5);
+          return {...q, opts:idxs.map(i=>q.opts[i]), correct:idxs.indexOf(q.correct)};
+        });
       pubAnswers.current=[];
       setPubExamList(shuffled);setPubIdx(0);setPubPicked(null);setPubShown(false);setPubLog([]);setPubDone(false);
     };
