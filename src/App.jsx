@@ -3080,6 +3080,7 @@ export default function App() {
     if(pubPhase==="done"){
       const ans=pubAnswers.current; const sc=ans.filter(x=>x.correct).length; const tot=pubExamList.length||1;
       const pct=Math.round((sc/tot)*100);
+      const siteUrl = window.location.origin+window.location.pathname;
       return (
         <Wrap>
           <div style={{maxWidth:520,margin:"0 auto",padding:"60px 24px",textAlign:"center"}}>
@@ -3088,7 +3089,21 @@ export default function App() {
             <div style={{color:C.text2,fontSize:16,marginTop:8}}>{sc} / {tot} bonnes réponses</div>
             <div style={{fontFamily:"Oswald,sans-serif",fontSize:14,letterSpacing:4,textTransform:"uppercase",color:pct2col(pct),marginTop:10}}>{pct>=70?"Réussi":"À améliorer"}</div>
             <div style={{color:C.muted,fontSize:13,marginTop:14}}>Résultat enregistré pour <strong style={{color:C.text}}>{pubName}</strong></div>
-            <div style={{color:C.muted,fontSize:12,marginTop:28}}>Vous pouvez fermer cette fenêtre.</div>
+
+            {/* CTA inscription */}
+            <div style={{margin:"36px auto 0",background:`linear-gradient(135deg,rgba(232,57,42,0.12),rgba(124,58,237,0.08))`,border:`1px solid ${C.red}33`,borderRadius:10,padding:"28px 24px",maxWidth:400}}>
+              <div style={{fontSize:28,marginBottom:10}}>🔥</div>
+              <div style={{fontFamily:"Oswald,sans-serif",fontSize:17,fontWeight:700,color:C.text,marginBottom:10,lineHeight:1.4}}>
+                Pour continuer de faire évoluer tes compétences, inscris-toi !
+              </div>
+              <div style={{color:C.text2,fontSize:13,marginBottom:20,lineHeight:1.7}}>
+                Accède à tous les QCM, suis ta progression, débloque des grades et des badges, et compare-toi aux autres sapeurs.
+              </div>
+              <a href={siteUrl} style={{display:"inline-flex",alignItems:"center",gap:8,background:C.red,color:"#fff",border:"none",borderRadius:6,padding:"12px 28px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:15,letterSpacing:1,textTransform:"uppercase",textDecoration:"none",boxShadow:`0 4px 20px ${C.red}55`}}>
+                🚀 Créer mon compte gratuitement
+              </a>
+              <div style={{color:C.muted,fontSize:11,marginTop:12}}>Gratuit · Sans engagement · 100% pompiers</div>
+            </div>
           </div>
         </Wrap>
       );
