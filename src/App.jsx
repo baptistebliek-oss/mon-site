@@ -971,12 +971,12 @@ export default function App() {
   const [gradeUpModal,setGradeUpModal] = useState(null); // grade object
   const [badgeModal,setBadgeModal]     = useState(false);
 
-  // Persister la page dans sessionStorage
+  // Persister la page dans localStorage (survit aux rechargements)
   useEffect(()=>{
     const SAFE = ["home","history","resources","admin","formateur"];
-    if(SAFE.includes(page)) sessionStorage.setItem("sp_page",page);
-    if(page==="auth"||page==="boot") sessionStorage.removeItem("sp_page");
-    setMobileMenu(false); // fermer menu mobile à chaque changement de page
+    if(SAFE.includes(page)) localStorage.setItem("sp_page",page);
+    if(page==="auth"||page==="boot") localStorage.removeItem("sp_page");
+    setMobileMenu(false);
   },[page]);
   useEffect(()=>{
     if(!document.querySelector("#gf-sp")){
@@ -992,7 +992,6 @@ export default function App() {
         .then(async({data,error})=>{
           if(data&&!error){
             setPubSession(data);
-            // Charger les questions en mode anonyme (pas besoin d'auth)
             const [cR,qR] = await Promise.all([
               sb.from("categories").select("*"),
               sb.from("questions").select("*"),
@@ -1005,14 +1004,38 @@ export default function App() {
         .catch(()=>setPage("auth"));
       return;
     }
+
+    // Si une page est sauvegardée, l'afficher tout de suite (évite le flash)
+    // Supabase va confirmer la session en arrière-plan
+    const savedPage = localStorage.getItem("sp_page");
+
     let handled=false;
     sb.auth.getSession().then(({data:{session}})=>{
-      if(session?.user&&!handled){handled=true;onSession(session.user);}
-      else if(!session) setPage("auth");
-    }).catch(()=>setPage("auth"));
+      if(session?.user&&!handled){
+        handled=true;
+        // Session valide → charger les données puis afficher la page sauvegardée
+        onSession(session.user);
+      } else if(!session){
+        // Pas de session → login
+        localStorage.removeItem("sp_page");
+        setPage("auth");
+      }
+    }).catch(()=>{
+      localStorage.removeItem("sp_page");
+      setPage("auth");
+    });
+
     const {data:{subscription}}=sb.auth.onAuthStateChange(async(event,session)=>{
-      if(event==="SIGNED_OUT"){handled=false;setUser(null);setIsAdmin(false);setIsFormateur(false);setPseudo("");setPage("auth");}
-      else if(event==="SIGNED_IN"&&session?.user&&!handled){handled=true;await onSession(session.user);}
+      if(event==="SIGNED_OUT"){
+        handled=false;
+        setUser(null);setIsAdmin(false);setIsFormateur(false);setPseudo("");
+        localStorage.removeItem("sp_page");
+        setPage("auth");
+      }
+      else if(event==="SIGNED_IN"&&session?.user&&!handled){
+        handled=true;
+        await onSession(session.user);
+      }
     });
     return ()=>subscription.unsubscribe();
   },[]);
@@ -1067,8 +1090,8 @@ export default function App() {
         setPseudo(prof.pseudo||u.email.split("@")[0]);
       } else setPseudo(u.email.split("@")[0]);
       await Promise.all([loadData(),loadMyResults(u.id)]);
-      // Restaurer la dernière page si possible
-      const saved = sessionStorage.getItem("sp_page");
+      // Restaurer la dernière page depuis localStorage
+      const saved = localStorage.getItem("sp_page");
       setPage(saved||"home");
     }catch(e){console.error(e);setPage("auth");}
   };
