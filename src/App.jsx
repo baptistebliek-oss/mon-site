@@ -834,7 +834,44 @@ export default function App() {
   const [page,setPage]           = useState("boot");
   const [user,setUser]           = useState(null);
   const [isAdmin,setIsAdmin]     = useState(false);
+  const [isFormateur,setIsFormateur] = useState(false);
   const [pseudo,setPseudo]       = useState("");
+
+  const [cats,setCats]           = useState([]);
+  const [qs,setQs]               = useState([]);
+  const [docs,setDocs]           = useState([]);
+  const [myResults,setMyResults] = useState([]);
+  const [allResults,setAllResults] = useState([]);
+  const [wrongIds,setWrongIds]   = useState(new Set());
+
+  const [authMode,setAuthMode]   = useState("login");
+  const [aEmail,setAEmail]       = useState("");
+  const [aPw,setAPw]             = useState("");
+  const [aPseudo,setAPseudo]     = useState("");
+  const [aErr,setAErr]           = useState("");
+  const [aBusy,setABusy]         = useState(false);
+
+  // ── Formateur
+  const [fTab,setFTab]             = useState("sessions");
+  const [mySessions,setMySessions] = useState([]);
+  const [myPending,setMyPending]   = useState([]);
+  const [sessionResults,setSessionResults] = useState({});
+  const [editSession,setEditSession] = useState(null);
+  const [editPQ,setEditPQ]         = useState(null);
+  const [fSaving,setFSaving]       = useState(false);
+  const [fErr,setFErr]             = useState("");
+  // Public session (QR / sans auth)
+  const [pubSession,setPubSession] = useState(null);
+  const [pubName,setPubName]       = useState("");
+  const [pubExamList,setPubExamList] = useState([]);
+  const [pubIdx,setPubIdx]         = useState(0);
+  const [pubPicked,setPubPicked]   = useState(null);
+  const [pubShown,setPubShown]     = useState(false);
+  const [pubLog,setPubLog]         = useState([]);
+  const pubAnswers                 = useRef([]);
+  const [pubDone,setPubDone]       = useState(false);
+  // Admin pending questions
+  const [pendingQs,setPendingQs]   = useState([]);
 
   const [cats,setCats]           = useState([]);
   const [qs,setQs]               = useState([]);
@@ -902,13 +939,28 @@ export default function App() {
       l.href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow:wght@300;400;500;600;700&display=swap";
       document.head.appendChild(l);
     }
+    // Détecter URL de session publique (?session=ID)
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session");
+    if(sessionId){
+      sb.from("sessions").select("*").eq("id",sessionId).eq("is_active",true).single()
+        .then(async({data})=>{
+          if(data){
+            setPubSession(data);
+            await loadData(); // charger les questions pour la session
+            setPage("pub-session");
+          } else setPage("auth");
+        })
+        .catch(()=>setPage("auth"));
+      return;
+    }
     let handled=false;
     sb.auth.getSession().then(({data:{session}})=>{
       if(session?.user&&!handled){handled=true;onSession(session.user);}
       else if(!session) setPage("auth");
     }).catch(()=>setPage("auth"));
     const {data:{subscription}}=sb.auth.onAuthStateChange(async(event,session)=>{
-      if(event==="SIGNED_OUT"){handled=false;setUser(null);setIsAdmin(false);setPseudo("");setPage("auth");}
+      if(event==="SIGNED_OUT"){handled=false;setUser(null);setIsAdmin(false);setIsFormateur(false);setPseudo("");setPage("auth");}
       else if(event==="SIGNED_IN"&&session?.user&&!handled){handled=true;await onSession(session.user);}
     });
     return ()=>subscription.unsubscribe();
@@ -958,8 +1010,11 @@ export default function App() {
     try{
       setUser(u);
       const {data:prof}=await sb.from("profiles").select("*").eq("id",u.id).single();
-      if(prof){setIsAdmin(prof.is_admin);setPseudo(prof.pseudo||u.email.split("@")[0]);}
-      else setPseudo(u.email.split("@")[0]);
+      if(prof){
+        setIsAdmin(prof.is_admin);
+        setIsFormateur(prof.is_formateur||false);
+        setPseudo(prof.pseudo||u.email.split("@")[0]);
+      } else setPseudo(u.email.split("@")[0]);
       await Promise.all([loadData(),loadMyResults(u.id)]);
       setPage("home");
     }catch(e){console.error(e);setPage("auth");}
@@ -985,6 +1040,66 @@ export default function App() {
   const loadAllResults=async()=>{
     const {data}=await sb.from("results").select("*").order("created_at",{ascending:false}).limit(500);
     if(data) setAllResults(data);
+  };
+
+  // ── FORMATEUR FUNCTIONS ──────────────────────────────────────
+  const loadMySessions=async()=>{
+    const {data}=await sb.from("sessions").select("*").eq("formateur_id",user.id).order("created_at",{ascending:false});
+    if(data) setMySessions(data);
+  };
+  const loadMyPending=async()=>{
+    const {data}=await sb.from("pending_questions").select("*").eq("formateur_id",user.id).order("created_at",{ascending:false});
+    if(data) setMyPending(data);
+  };
+  const loadSessionResults=async(sessionId)=>{
+    const {data}=await sb.from("session_results").select("*").eq("session_id",sessionId).order("created_at",{ascending:false});
+    if(data) setSessionResults(prev=>({...prev,[sessionId]:data}));
+  };
+  const loadPendingQs=async()=>{
+    const {data}=await sb.from("pending_questions").select("*,categories(name,color)").order("created_at",{ascending:false});
+    if(data) setPendingQs(data);
+  };
+  const saveSession=async(data)=>{
+    setFSaving(true);setFErr("");
+    const payload={formateur_id:user.id,formateur_name:pseudo,title:data.title,description:data.description||"",cat_ids:data.cat_ids||[],max_questions:data.max_questions||20,is_active:true};
+    if(mySessions.some(s=>s.id===data.id)){
+      const {error}=await sb.from("sessions").update(payload).eq("id",data.id);
+      if(!error){await loadMySessions();setEditSession(null);}else setFErr(error.message);
+    } else {
+      const {data:ns,error}=await sb.from("sessions").insert(payload).select().single();
+      if(!error&&ns){await loadMySessions();setEditSession(null);}else setFErr(error?.message||"Erreur");
+    }
+    setFSaving(false);
+  };
+  const savePendingQ=async(data)=>{
+    setFSaving(true);setFErr("");
+    const payload={formateur_id:user.id,formateur_name:pseudo,cat_id:data.catId,text:data.text,options:data.opts,correct_index:data.correct,explanation:data.expl||"",status:"pending"};
+    if(myPending.some(q=>q.id===data.id)){
+      const {error}=await sb.from("pending_questions").update(payload).eq("id",data.id);
+      if(!error){await loadMyPending();setEditPQ(null);}else setFErr(error.message);
+    } else {
+      const {error}=await sb.from("pending_questions").insert(payload).select().single();
+      if(!error){await loadMyPending();setEditPQ(null);}else setFErr(error?.message||"Erreur");
+    }
+    setFSaving(false);
+  };
+  const validatePQ=async(id,status,note="")=>{
+    const {error}=await sb.from("pending_questions").update({status,admin_note:note}).eq("id",id);
+    if(!error){
+      if(status==="approved"){
+        const pq=pendingQs.find(q=>q.id===id);
+        if(pq) await sb.from("questions").insert({cat_id:pq.cat_id,text:pq.text,options:pq.options,correct_index:pq.correct_index,explanation:pq.explanation||""});
+      }
+      await loadPendingQs();
+    }
+  };
+  // Public session submit
+  const submitPubExam=async()=>{
+    const sc=pubAnswers.current.filter(x=>x.correct).length;
+    const total=pubExamList.length;
+    const pct=Math.round((sc/total)*100);
+    await sb.from("session_results").insert({session_id:pubSession.id,participant_name:pubName,score:sc,total,pct,answers:pubAnswers.current});
+    setPubDone(true);
   };
 
   // ── AUTH ─────────────────────────────────────────────────────
@@ -1285,6 +1400,7 @@ export default function App() {
             </span>
             {myResults.length>0&&<Btn onClick={()=>setPage("history")} ghost sm>📊 Mon bilan</Btn>}
             <Btn onClick={()=>{setResCat("all");setPage("resources");}} ghost sm>📚 Ressources</Btn>
+            {isFormateur&&!isAdmin&&<Btn onClick={()=>{setFTab("sessions");setPage("formateur");}} sm color={C.purple}>📚 Formateur</Btn>}
             {isAdmin&&<Btn onClick={()=>{setAdminTab("qs");setPage("admin");}} sm color={C.red}>⚙ Admin</Btn>}
             <button onClick={doLogout} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",padding:"4px 8px"}} onMouseEnter={e=>e.currentTarget.style.color=C.text2} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>Déco.</button>
           </>}
@@ -1855,8 +1971,19 @@ export default function App() {
     const pct=Math.round((sc/total)*100);
     const passed=pct>=70;
     const emoji=pct>=95?"🏆":pct>=80?"✅":pct>=60?"⚠️":"❌";
+    const nonGradeNewBadges=newBadges.filter(b=>!b.grade);
     return (
       <Wrap>
+        {/* ── ANIMATIONS SUPERPOSÉES ── */}
+        {gradeUpModal&&(
+          <GradeUpModal grade={gradeUpModal} pseudo={pseudo} onClose={()=>{
+            setGradeUpModal(null);
+            if(nonGradeNewBadges.length) setBadgeModal(true);
+          }}/>
+        )}
+        {!gradeUpModal&&badgeModal&&nonGradeNewBadges.length>0&&(
+          <BadgesUnlockModal badges={nonGradeNewBadges} onClose={()=>setBadgeModal(false)}/>
+        )}
         <div style={{maxWidth:680,margin:"0 auto",padding:"52px 24px",textAlign:"center"}}>
           <div style={{fontSize:56,marginBottom:14}}>{emoji}</div>
           <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(56px,14vw,96px)",fontWeight:700,color:pct2col(pct),lineHeight:1}}>{pct}%</div>
@@ -1911,7 +2038,7 @@ export default function App() {
 
   // ── ADMIN ──────────────────────────────────────────────────
   if(page==="admin"){
-    const enterTab=async tab=>{setAdminTab(tab);setEditQ(null);setEditCat(null);setEditDoc(null);setSaveErr("");if(tab==="classement")await loadAllResults();};
+    const enterTab=async tab=>{setAdminTab(tab);setEditQ(null);setEditCat(null);setEditDoc(null);setSaveErr("");if(tab==="classement")await loadAllResults();if(tab==="pending")await loadPendingQs();};
     const filteredResults=classFilter==="all"?allResults:allResults.filter(r=>r.cat_id===classFilter);
     const pseudos=[...new Set(filteredResults.map(r=>r.pseudo))];
     const leaderboard=pseudos.map(p=>{
@@ -1930,8 +2057,10 @@ export default function App() {
           <button onClick={()=>setPage("home")} style={{background:"transparent",color:C.muted,border:"none",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif"}} onMouseEnter={e=>e.currentTarget.style.color=C.text2} onMouseLeave={e=>e.currentTarget.style.color=C.muted}>← Retour au site</button>
         </div>
         <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",padding:"0 20px",overflowX:"auto"}}>
-          {[["qs","📋 Questions"],["cats","🗂 Catégories"],["documents","📚 Documents"],["classement","🏆 Classement"],["settings","⚙ Paramètres"]].map(([k,l])=>(
-            <button key={k} onClick={()=>enterTab(k)} style={{background:"none",border:"none",borderBottom:`2px solid ${adminTab===k?C.red:"transparent"}`,color:adminTab===k?C.text:C.muted,padding:"14px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14,whiteSpace:"nowrap",transition:"all 0.15s"}}>{l}</button>
+          {[["qs","📋 Questions"],["cats","🗂 Catégories"],["documents","📚 Documents"],["classement","🏆 Classement"],["pending","⏳ En attente"],["settings","⚙ Paramètres"]].map(([k,l])=>(
+            <button key={k} onClick={()=>enterTab(k)} style={{background:"none",border:"none",borderBottom:`2px solid ${adminTab===k?C.red:"transparent"}`,color:adminTab===k?C.text:C.muted,padding:"14px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14,whiteSpace:"nowrap",transition:"all 0.15s"}}>
+              {l}{k==="pending"&&pendingQs.filter(q=>q.status==="pending").length>0&&<span style={{background:C.orange,color:"#000",fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:20,marginLeft:5}}>{pendingQs.filter(q=>q.status==="pending").length}</span>}
+            </button>
           ))}
         </div>
         <div style={{maxWidth:960,margin:"0 auto",padding:"32px 24px"}}>
@@ -2174,6 +2303,59 @@ export default function App() {
             </div>
           )}
 
+          {adminTab==="pending"&&(()=>{
+            const pending=pendingQs.filter(q=>q.status==="pending");
+            const approved=pendingQs.filter(q=>q.status==="approved");
+            const rejected=pendingQs.filter(q=>q.status==="rejected");
+            const PQCard=({pq,showActions})=>{
+              const cat=cats.find(c=>c.id===pq.cat_id);
+              return (
+                <div style={{background:C.card,border:`1px solid ${pq.status==="pending"?C.orange+"44":pq.status==="approved"?C.greenL+"44":C.red+"22"}`,borderRadius:4,padding:"16px 18px",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:10,flexWrap:"wrap"}}>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",gap:8,marginBottom:6,flexWrap:"wrap"}}>
+                        {cat&&<span style={{fontSize:11,color:cat.color,fontWeight:700,background:cat.color+"18",borderRadius:20,padding:"1px 9px"}}>{cat.name}</span>}
+                        <span style={{fontSize:11,color:C.muted}}>par <strong style={{color:C.text2}}>{pq.formateur_name}</strong></span>
+                        <span style={{fontSize:11,color:pq.status==="pending"?C.orange:pq.status==="approved"?C.greenL:C.red,fontWeight:700}}>{pq.status==="pending"?"⏳ En attente":pq.status==="approved"?"✓ Approuvée":"✗ Rejetée"}</span>
+                      </div>
+                      <div style={{fontSize:14,fontWeight:600,marginBottom:8}}>{pq.text}</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                        {(pq.options||[]).map((opt,i)=>(
+                          <div key={i} style={{fontSize:12,color:i===pq.correct_index?C.greenL:C.text2,background:i===pq.correct_index?"#081e1044":C.surf,border:`1px solid ${i===pq.correct_index?C.greenL+"44":C.border}`,borderRadius:3,padding:"4px 8px"}}>
+                            <span style={{fontFamily:"Oswald,sans-serif",fontWeight:700,marginRight:6,color:i===pq.correct_index?C.greenL:"#404050"}}>{"ABCD"[i]}</span>{opt}
+                          </div>
+                        ))}
+                      </div>
+                      {pq.explanation&&<div style={{color:C.muted,fontSize:12,marginTop:6,fontStyle:"italic"}}>💡 {pq.explanation}</div>}
+                      {pq.admin_note&&<div style={{color:C.red,fontSize:12,marginTop:4}}>Note : {pq.admin_note}</div>}
+                    </div>
+                    {showActions&&(
+                      <div style={{display:"flex",gap:8,flexShrink:0,flexDirection:"column"}}>
+                        <button onClick={()=>validatePQ(pq.id,"approved")} style={{background:"#081e10",border:`1px solid ${C.greenL}44`,color:C.greenL,borderRadius:4,padding:"6px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>✓ Approuver</button>
+                        <button onClick={()=>{const n=window.prompt("Raison du rejet (optionnel) :");validatePQ(pq.id,"rejected",n||"");}} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"6px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:700}}>✗ Rejeter</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            };
+            return (
+              <div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Questions en attente</h2>
+                    {pending.length>0&&<span style={{background:C.orange,color:"#000",fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20}}>{pending.length}</span>}
+                  </div>
+                  <button onClick={loadPendingQs} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 11px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif"}}>🔄 Actualiser</button>
+                </div>
+                {pendingQs.length===0&&<div style={{textAlign:"center",color:C.muted,padding:"60px 0"}}><div style={{fontSize:36,marginBottom:10}}>📬</div>Aucune question soumise pour le moment.</div>}
+                {pending.length>0&&(<><div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.orange,marginBottom:12}}>⏳ À valider ({pending.length})</div>{pending.map(pq=><PQCard key={pq.id} pq={pq} showActions/>)}<div style={{height:1,background:C.border,margin:"20px 0"}}/></>)}
+                {approved.length>0&&(<><div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.greenL,marginBottom:12}}>✓ Approuvées ({approved.length})</div>{approved.map(pq=><PQCard key={pq.id} pq={pq} showActions={false}/>)}<div style={{height:1,background:C.border,margin:"20px 0"}}/></>)}
+                {rejected.length>0&&(<><div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.red,marginBottom:12}}>✗ Rejetées ({rejected.length})</div>{rejected.map(pq=><PQCard key={pq.id} pq={pq} showActions={false}/>)}</>)}
+              </div>
+            );
+          })()}
+
           {adminTab==="settings"&&(
             <div style={{maxWidth:480}}>
               <h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",marginBottom:28}}>Paramètres du compte</h2>
@@ -2221,19 +2403,323 @@ export default function App() {
     );
   }
 
-  // ── MODALS GLOBAUX (hors pages) ────────────────────────────────
+  // ── PAGE FORMATEUR ─────────────────────────────────────────
+  if(page==="formateur"){
+    const siteUrl = window.location.origin+window.location.pathname;
+    const qrUrl = id => `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(siteUrl+"?session="+id)}&bgcolor=0e0e14&color=e8e6e1&margin=10`;
+    const sessionLink = id => siteUrl+"?session="+id;
+
+    // Formulaire de session
+    const [sf,setSf] = useState({title:"",description:"",cat_ids:[],max_questions:20});
+    const editingSession = editSession ? mySessions.find(s=>s.id===editSession)||{id:editSession,...sf} : null;
+
+    // Formulaire question
+    const [pqf,setPqf] = useState({catId:cats[0]?.id||"",text:"",opts:["","","",""],correct:0,expl:""});
+
+    return (
+      <Wrap>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 24px",height:56}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:16}}>📚</span>
+            <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:3,textTransform:"uppercase"}}>Espace Formateur</span>
+            <span style={{background:C.purple,color:"#fff",fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20}}>FORMATEUR</span>
+          </div>
+          <button onClick={()=>setPage("home")} style={{background:"transparent",color:C.muted,border:"none",cursor:"pointer",fontSize:13,fontFamily:"'Barlow',sans-serif"}}>← Retour au site</button>
+        </div>
+        <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,display:"flex",padding:"0 20px",overflowX:"auto"}}>
+          {[["sessions","🔗 Mes sessions"],["questions","📝 Mes questions"]].map(([k,l])=>(
+            <button key={k} onClick={()=>{setFTab(k);setEditSession(null);setEditPQ(null);setFErr(""); if(k==="sessions")loadMySessions(); if(k==="questions")loadMyPending();}}
+              style={{background:"none",border:"none",borderBottom:`2px solid ${fTab===k?C.purple:"transparent"}`,color:fTab===k?C.text:C.muted,padding:"13px 16px",cursor:"pointer",fontFamily:"'Barlow',sans-serif",fontWeight:700,fontSize:14,whiteSpace:"nowrap"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <div style={{maxWidth:900,margin:"0 auto",padding:"32px 24px"}}>
+
+          {/* ── SESSIONS ── */}
+          {fTab==="sessions"&&(
+            <div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+                <h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Mes sessions ({mySessions.length})</h2>
+                <Btn onClick={async()=>{await loadMySessions();setSf({title:"",description:"",cat_ids:[],max_questions:20});setEditSession("new");}} sm color={C.purple}>+ Créer une session</Btn>
+              </div>
+              {fErr&&<ErrBox msg={fErr}/>}
+
+              {/* Formulaire création/édition session */}
+              {editSession&&(
+                <div style={{background:C.card,border:`1px solid ${C.purple}44`,borderRadius:6,padding:"20px 22px",marginBottom:24}}>
+                  <div style={{fontFamily:"Oswald,sans-serif",fontSize:14,letterSpacing:2,textTransform:"uppercase",color:C.purple,marginBottom:16}}>{editSession==="new"?"Nouvelle session":"Modifier la session"}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                    <div><FL>Titre de la session *</FL><Field value={sf.title} onChange={e=>setSf(x=>({...x,title:e.target.value}))} placeholder="Ex : QCM Secourisme - Groupe A"/></div>
+                    <div><FL>Description</FL><Field value={sf.description} onChange={e=>setSf(x=>({...x,description:e.target.value}))} placeholder="Informations pour les participants..." rows={2}/></div>
+                    <div>
+                      <FL>Catégories incluses (laissez vide = toutes)</FL>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                        {cats.map(cat=>{
+                          const sel=sf.cat_ids.includes(cat.id);
+                          return <button key={cat.id} onClick={()=>setSf(x=>({...x,cat_ids:sel?x.cat_ids.filter(id=>id!==cat.id):[...x.cat_ids,cat.id]}))} style={{background:sel?cat.color+"22":"transparent",color:sel?cat.color:C.muted,border:`1px solid ${sel?cat.color:C.border2}`,borderRadius:20,padding:"4px 14px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>{cat.name}</button>;
+                        })}
+                      </div>
+                    </div>
+                    <div><FL>Nombre de questions max</FL>
+                      <div style={{display:"flex",gap:8}}>
+                        {[10,20,30,40].map(n=><button key={n} onClick={()=>setSf(x=>({...x,max_questions:n}))} style={{background:sf.max_questions===n?C.purple:"transparent",color:sf.max_questions===n?"#fff":C.muted,border:`1px solid ${sf.max_questions===n?C.purple:C.border2}`,borderRadius:4,padding:"7px 16px",cursor:"pointer",fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:15}}>{n}</button>)}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:10}}>
+                      <Btn onClick={async()=>await saveSession(editSession==="new"?sf:{id:editSession,...sf})} disabled={!sf.title.trim()||fSaving} color={C.purple}>{fSaving?"Enregistrement...":"✓ Enregistrer"}</Btn>
+                      <Btn onClick={()=>{setEditSession(null);setFErr("");}} ghost>Annuler</Btn>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Liste des sessions */}
+              {mySessions.length===0&&!editSession&&<div style={{textAlign:"center",color:C.muted,padding:"60px 0"}}><div style={{fontSize:36,marginBottom:10}}>🔗</div>Aucune session créée. Créez-en une pour obtenir un QR code.</div>}
+              <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                {mySessions.map(s=>{
+                  const link=sessionLink(s.id);
+                  const catNames=(s.cat_ids||[]).map(id=>cats.find(c=>c.id===id)?.name).filter(Boolean);
+                  const res=sessionResults[s.id];
+                  return (
+                    <div key={s.id} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:6,overflow:"hidden"}}>
+                      <div style={{padding:"16px 20px",display:"flex",gap:16,flexWrap:"wrap",alignItems:"flex-start"}}>
+                        {/* Info session */}
+                        <div style={{flex:1,minWidth:200}}>
+                          <div style={{fontFamily:"Oswald,sans-serif",fontSize:16,fontWeight:700,marginBottom:4}}>{s.title}</div>
+                          {s.description&&<div style={{color:C.muted,fontSize:13,marginBottom:6}}>{s.description}</div>}
+                          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                            {catNames.length>0?catNames.map(n=>{const cat=cats.find(c=>c.name===n);return <span key={n} style={{fontSize:11,color:cat?.color||C.muted,background:(cat?.color||C.muted)+"18",borderRadius:20,padding:"1px 9px",fontWeight:600}}>{n}</span>;}):
+                              <span style={{fontSize:11,color:C.muted}}>Toutes catégories</span>}
+                            <span style={{fontSize:11,color:C.muted}}>· {s.max_questions} questions max</span>
+                          </div>
+                          {/* Lien */}
+                          <div style={{background:C.surf,border:`1px solid ${C.border2}`,borderRadius:4,padding:"6px 10px",display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{fontSize:11,color:C.muted,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{link}</span>
+                            <button onClick={()=>navigator.clipboard.writeText(link)} style={{background:C.purple,color:"#fff",border:"none",borderRadius:3,padding:"3px 10px",cursor:"pointer",fontSize:11,fontFamily:"'Barlow',sans-serif",fontWeight:700,flexShrink:0}}>📋 Copier</button>
+                          </div>
+                        </div>
+                        {/* QR Code */}
+                        <div style={{textAlign:"center",flexShrink:0}}>
+                          <img src={qrUrl(s.id)} alt="QR" style={{width:120,height:120,borderRadius:6,border:`1px solid ${C.border}`}}/>
+                          <div style={{color:C.muted,fontSize:10,marginTop:4}}>Scanner pour accéder</div>
+                        </div>
+                      </div>
+                      {/* Actions + résultats */}
+                      <div style={{borderTop:`1px solid ${C.border}`,padding:"10px 20px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                        <button onClick={async()=>{await loadSessionResults(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>📊 Voir les résultats</button>
+                        <button onClick={()=>{setSf({title:s.title,description:s.description||"",cat_ids:s.cat_ids||[],max_questions:s.max_questions});setEditSession(s.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"5px 12px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Modifier</button>
+                        <button onClick={async()=>{if(window.confirm("Supprimer cette session ?"))await sb.from("sessions").delete().eq("id",s.id).then(()=>loadMySessions());}} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"5px 10px",cursor:"pointer",fontSize:12}}>🗑</button>
+                        {/* Résultats inline */}
+                        {res&&(
+                          <div style={{width:"100%",marginTop:10}}>
+                            <div style={{fontFamily:"Oswald,sans-serif",fontSize:11,letterSpacing:3,textTransform:"uppercase",color:C.muted,marginBottom:8}}>{res.length} participant{res.length!==1?"s":""}</div>
+                            {res.length===0?<div style={{color:C.muted,fontSize:13}}>Aucun participant pour le moment.</div>:(
+                              <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                                {res.map(r=>(
+                                  <div key={r.id} style={{background:C.surf,border:`1px solid ${C.border}`,borderRadius:3,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                                    <span style={{fontWeight:600,fontSize:13}}>{r.participant_name}</span>
+                                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                                      <span style={{color:C.muted,fontSize:12}}>{r.score}/{r.total}</span>
+                                      <ScorePill pct={r.pct}/>
+                                      <span style={{color:C.muted,fontSize:11}}>{fmtDate(r.created_at)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── QUESTIONS PROPOSÉES ── */}
+          {fTab==="questions"&&(
+            <div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <h2 style={{fontFamily:"Oswald,sans-serif",fontSize:16,letterSpacing:2,textTransform:"uppercase",margin:0}}>Mes questions soumises</h2>
+                  <span style={{background:C.faint,color:C.muted,fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:20}}>{myPending.length}</span>
+                </div>
+                <Btn onClick={()=>{setPqf({catId:cats[0]?.id||"",text:"",opts:["","","",""],correct:0,expl:""});setEditPQ("new");}} disabled={cats.length===0} sm color={C.purple}>+ Proposer une question</Btn>
+              </div>
+              <div style={{background:"#0d0e1a",border:`1px solid ${C.purple}33`,borderRadius:4,padding:"12px 16px",marginBottom:20,fontSize:13,color:C.text2,lineHeight:1.6}}>
+                💡 Les questions que vous proposez seront <strong style={{color:C.text}}>relues par l'administrateur</strong> avant d'être éventuellement ajoutées à la base de questions commune.
+              </div>
+              {fErr&&<ErrBox msg={fErr}/>}
+              {editPQ&&(
+                <div style={{background:C.card,border:`1px solid ${C.purple}44`,borderRadius:6,padding:"20px 22px",marginBottom:20}}>
+                  <div style={{fontFamily:"Oswald,sans-serif",fontSize:14,letterSpacing:2,textTransform:"uppercase",color:C.purple,marginBottom:16}}>Proposer une question</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                    <div><FL>Catégorie *</FL>
+                      <select value={pqf.catId} onChange={e=>setPqf(x=>({...x,catId:e.target.value}))} style={{width:"100%",background:C.surf,border:`1px solid ${C.border2}`,borderRadius:4,color:C.text,padding:"11px 14px",fontSize:14,fontFamily:"'Barlow',sans-serif",outline:"none"}}>
+                        {cats.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div><FL>Intitulé de la question *</FL><Field value={pqf.text} onChange={e=>setPqf(x=>({...x,text:e.target.value}))} placeholder="Saisissez votre question..." rows={3}/></div>
+                    <div>
+                      <FL>Options — cliquez la lettre pour la bonne réponse *</FL>
+                      {pqf.opts.map((opt,i)=>(
+                        <div key={i} style={{display:"flex",gap:10,marginBottom:10,alignItems:"center"}}>
+                          <button onClick={()=>setPqf(x=>({...x,correct:i}))} style={{width:34,height:34,flexShrink:0,border:`2px solid ${pqf.correct===i?C.greenL:C.border2}`,borderRadius:4,background:pqf.correct===i?"#0a2214":"transparent",color:pqf.correct===i?C.greenL:C.muted,fontFamily:"Oswald,sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>{LABELS[i]}</button>
+                          <input value={opt||""} onChange={e=>{const o=[...pqf.opts];o[i]=e.target.value;setPqf(x=>({...x,opts:o}));}} placeholder={`Réponse ${LABELS[i]}`} style={{flex:1,background:C.surf,border:`1px solid ${pqf.correct===i?"#1a4a28":C.border2}`,borderRadius:4,color:C.text,padding:"10px 14px",fontSize:14,fontFamily:"'Barlow',sans-serif",outline:"none"}}/>
+                        </div>
+                      ))}
+                    </div>
+                    <div><FL>Explication (optionnel)</FL><Field value={pqf.expl||""} onChange={e=>setPqf(x=>({...x,expl:e.target.value}))} placeholder="Affichée après la réponse..." rows={2}/></div>
+                    <div style={{display:"flex",gap:10}}>
+                      <Btn onClick={async()=>{if(!pqf.text.trim()||!pqf.catId||!pqf.opts.every(o=>o.trim()))return;await savePendingQ(editPQ==="new"?pqf:{id:editPQ,...pqf});}} disabled={fSaving||!pqf.text.trim()||!pqf.opts.every(o=>o.trim())} color={C.purple}>{fSaving?"Envoi...":"📤 Soumettre à validation"}</Btn>
+                      <Btn onClick={()=>{setEditPQ(null);setFErr("");}} ghost>Annuler</Btn>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {myPending.length===0&&!editPQ?<div style={{textAlign:"center",color:C.muted,padding:"60px 0"}}><div style={{fontSize:36,marginBottom:10}}>📝</div>Aucune question soumise. Proposez-en une !</div>:(
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {myPending.map(pq=>{
+                    const cat=cats.find(c=>c.id===pq.cat_id);
+                    return (
+                      <div key={pq.id} style={{background:C.card,border:`1px solid ${pq.status==="pending"?C.orange+"44":pq.status==="approved"?C.greenL+"44":C.red+"33"}`,borderRadius:4,padding:"14px 18px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                          {cat&&<span style={{fontSize:11,color:cat.color,fontWeight:700,background:cat.color+"18",borderRadius:20,padding:"1px 9px"}}>{cat.name}</span>}
+                          <span style={{fontSize:11,fontWeight:700,color:pq.status==="pending"?C.orange:pq.status==="approved"?C.greenL:C.red}}>{pq.status==="pending"?"⏳ En attente de validation":pq.status==="approved"?"✅ Approuvée — ajoutée à la base !":"❌ Rejetée"}</span>
+                        </div>
+                        <div style={{fontSize:14,fontWeight:500}}>{pq.text}</div>
+                        {pq.admin_note&&<div style={{color:C.red,fontSize:12,marginTop:6}}>Note admin : {pq.admin_note}</div>}
+                        {pq.status==="pending"&&<div style={{marginTop:10,display:"flex",gap:8}}>
+                          <button onClick={()=>{setPqf({catId:pq.cat_id,text:pq.text,opts:pq.options,correct:pq.correct_index,expl:pq.explanation});setEditPQ(pq.id);}} style={{background:C.card2,border:`1px solid ${C.border2}`,color:C.muted,borderRadius:4,padding:"4px 11px",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif",fontWeight:600}}>✏ Modifier</button>
+                          <button onClick={async()=>{if(window.confirm("Supprimer cette question ?"))await sb.from("pending_questions").delete().eq("id",pq.id).then(loadMyPending);}} style={{background:"#1e080822",border:"1px solid #4a181844",color:"#e05050",borderRadius:4,padding:"4px 9px",cursor:"pointer",fontSize:12}}>🗑</button>
+                        </div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Wrap>
+    );
+  }
+
+  // ── PAGE SESSION PUBLIQUE (QR code, sans compte) ────────────
+  if(page==="pub-session"){
+    const startPubExam=()=>{
+      if(!pubName.trim()||!pubSession) return;
+      const catIds=pubSession.cat_ids||[];
+      const pool=qs.filter(q=>catIds.length===0||catIds.includes(q.catId));
+      if(!pool.length){ alert("Aucune question disponible pour cette session."); return; }
+      const shuffled=pool.sort(()=>Math.random()-0.5).slice(0,pubSession.max_questions||20).map(q=>{
+        const idxs=[0,1,2,3].sort(()=>Math.random()-0.5);
+        return {...q,opts:idxs.map(i=>q.opts[i]),correct:idxs.indexOf(q.correct)};
+      });
+      pubAnswers.current=[];
+      setPubExamList(shuffled);setPubIdx(0);setPubPicked(null);setPubShown(false);setPubLog([]);setPubDone(false);
+    };
+    const validatePub=()=>{
+      if(pubPicked===null) return;
+      const ok=pubPicked===pubExamList[pubIdx].correct;
+      pubAnswers.current=[...pubAnswers.current,{correct:ok}];
+      setPubLog([...pubAnswers.current]);setPubShown(true);
+    };
+    const nextPub=async()=>{
+      if(pubIdx+1>=pubExamList.length){ await submitPubExam(); }
+      else { setPubIdx(i=>i+1);setPubPicked(null);setPubShown(false); }
+    };
+
+    // Chargement des questions si pas encore fait (fait au boot via loadData)
+
+    if(pubDone){
+      const sc=pubAnswers.current.filter(x=>x.correct).length;
+      const t=pubExamList.length;
+      const pct=Math.round((sc/t)*100);
+      return (
+        <Wrap>
+          <div style={{maxWidth:560,margin:"0 auto",padding:"60px 24px",textAlign:"center"}}>
+            <div style={{fontSize:50,marginBottom:12}}>{pct>=70?"🎉":"💪"}</div>
+            <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(52px,14vw,80px)",fontWeight:700,color:pct2col(pct),lineHeight:1}}>{pct}%</div>
+            <div style={{color:C.text2,fontSize:16,marginTop:8}}>{sc} / {t} bonnes réponses</div>
+            <div style={{fontFamily:"Oswald,sans-serif",fontSize:14,letterSpacing:4,textTransform:"uppercase",color:pct2col(pct),marginTop:10}}>{pct>=70?"Réussi":"À améliorer"}</div>
+            <div style={{color:C.muted,fontSize:13,marginTop:14}}>Résultat enregistré pour <strong style={{color:C.text}}>{pubName}</strong></div>
+            <div style={{marginTop:32,color:C.muted,fontSize:13}}>Vous pouvez fermer cette fenêtre.</div>
+          </div>
+        </Wrap>
+      );
+    }
+    if(pubExamList.length>0){
+      const q=pubExamList[pubIdx];
+      const isCorrect=pubPicked===q.correct;
+      return (
+        <Wrap>
+          <div style={{height:4,background:C.border}}><div style={{height:"100%",background:C.purple,width:`${(pubIdx/pubExamList.length)*100}%`,transition:"width 0.4s"}}/></div>
+          <div style={{background:C.surf,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:50,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,letterSpacing:2,color:C.purple}}>{pubSession.title}</span>
+            <span style={{fontFamily:"Oswald,sans-serif",color:C.muted,fontSize:13}}>{pubIdx+1} / {pubExamList.length}</span>
+          </div>
+          {/* Progress live */}
+          {pubLog.length>0&&(
+            <div style={{background:C.card,borderBottom:`1px solid ${C.border}`,padding:"8px 24px",display:"flex",alignItems:"center",gap:14}}>
+              <div style={{flex:1,background:C.bg,borderRadius:99,height:7,overflow:"hidden",position:"relative"}}>
+                <div style={{position:"absolute",left:0,top:0,height:"100%",width:`${(pubLog.filter(x=>x.correct).length/pubExamList.length)*100}%`,background:C.greenL,borderRadius:99,transition:"width 0.4s"}}/>
+                <div style={{position:"absolute",left:`${(pubLog.filter(x=>x.correct).length/pubExamList.length)*100}%`,top:0,height:"100%",width:`${((pubLog.length-pubLog.filter(x=>x.correct).length)/pubExamList.length)*100}%`,background:C.red,borderRadius:99,transition:"width 0.4s"}}/>
+              </div>
+              <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,color:pct2col(Math.round(pubLog.filter(x=>x.correct).length/pubLog.length*100)),fontWeight:700}}>{pubLog.filter(x=>x.correct).length}/{pubLog.length}</span>
+            </div>
+          )}
+          <div style={{maxWidth:660,margin:"0 auto",padding:"36px 24px"}}>
+            <div style={{fontFamily:"Oswald,sans-serif",fontSize:"clamp(17px,3vw,22px)",fontWeight:500,lineHeight:1.55,marginBottom:32}}>{q.text}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
+              {q.opts.map((opt,i)=>{
+                let bg=C.card,brd=`1px solid ${C.border}`,clr=C.text;
+                if(!pubShown&&pubPicked===i){bg="#14162e";brd=`1px solid ${C.purple}`;}
+                if(pubShown){if(i===q.correct){bg="#0a2014";brd=`1px solid ${C.greenL}`;clr=C.greenL;}else if(i===pubPicked&&i!==q.correct){bg="#1e0808";brd=`1px solid ${C.red}`;}}
+                return (
+                  <div key={i} onClick={()=>!pubShown&&setPubPicked(i)} style={{background:bg,border:brd,borderRadius:6,padding:"14px 18px",cursor:pubShown?"default":"pointer",display:"flex",alignItems:"center",gap:14,color:clr,transition:"all 0.12s"}}>
+                    <span style={{fontFamily:"Oswald,sans-serif",fontSize:13,fontWeight:700,minWidth:22,color:pubShown&&i===q.correct?C.greenL:pubShown&&i===pubPicked&&i!==q.correct?C.red:"#404050"}}>{LABELS[i]}</span>
+                    <span style={{fontSize:15,flex:1,lineHeight:1.5}}>{opt}</span>
+                    {pubShown&&i===q.correct&&<span style={{color:C.greenL,fontWeight:700}}>✓</span>}
+                    {pubShown&&i===pubPicked&&i!==q.correct&&<span style={{color:C.red,fontWeight:700}}>✗</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {pubShown&&q.expl&&<div style={{background:isCorrect?"#091c10":"#1e0808",border:`1px solid ${isCorrect?"#1c4228":"#421810"}`,borderRadius:6,padding:"13px 18px",marginBottom:22}}><div style={{color:isCorrect?C.greenL:C.orange,fontSize:13,fontWeight:700,marginBottom:5}}>{isCorrect?"✓ Bonne réponse !":"✗ Mauvaise réponse"}</div><div style={{color:C.text2,fontSize:14,lineHeight:1.65}}>{q.expl}</div></div>}
+            {!pubShown?<Btn onClick={validatePub} disabled={pubPicked===null} full>VALIDER MA RÉPONSE</Btn>:<Btn onClick={nextPub} full color={C.purple}>{pubIdx+1>=pubExamList.length?"VOIR MON SCORE →":"QUESTION SUIVANTE →"}</Btn>}
+          </div>
+        </Wrap>
+      );
+    }
+    // Écran d'accueil session
+    return (
+      <Wrap>
+        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:`radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.1) 0%, transparent 60%)`}}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:`3px solid ${C.purple}`,borderRadius:8,padding:"36px 30px",width:"100%",maxWidth:380,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.5)"}}>
+            <div style={{fontSize:48,marginBottom:14,filter:"drop-shadow(0 0 20px rgba(124,58,237,0.5))"}}>📋</div>
+            <div style={{fontFamily:"Oswald,sans-serif",fontSize:20,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:C.text,marginBottom:6}}>{pubSession?.title}</div>
+            {pubSession?.description&&<div style={{color:C.muted,fontSize:13,marginBottom:20,lineHeight:1.6}}>{pubSession.description}</div>}
+            <div style={{color:C.muted,fontSize:12,marginBottom:24}}>
+              {pubSession?.max_questions} questions · Résultats transmis au formateur
+            </div>
+            <div style={{textAlign:"left",marginBottom:20}}>
+              <FL>Votre prénom et nom *</FL>
+              <Field value={pubName} onChange={e=>setPubName(e.target.value)} placeholder="Ex : Jean Dupont" onKeyDown={e=>e.key==="Enter"&&startPubExam()} autoFocus/>
+            </div>
+            <Btn onClick={startPubExam} disabled={!pubName.trim()||!qs.length} full color={C.purple}>COMMENCER →</Btn>
+            {!qs.length&&<div style={{color:C.muted,fontSize:12,marginTop:10}}>Chargement des questions...</div>}
+          </div>
+        </div>
+      </Wrap>
+    );
+  }
+
+  // ── MODALS GLOBAUX (fallback si non résultats) ──────────────
   const nonGradeNewBadges = newBadges.filter(b=>!b.grade);
-  return (
-    <>
-      {gradeUpModal&&(
-        <GradeUpModal grade={gradeUpModal} pseudo={pseudo} onClose={()=>{
-          setGradeUpModal(null);
-          if(nonGradeNewBadges.length) setBadgeModal(true);
-        }}/>
-      )}
-      {!gradeUpModal&&badgeModal&&nonGradeNewBadges.length>0&&(
-        <BadgesUnlockModal badges={nonGradeNewBadges} onClose={()=>setBadgeModal(false)}/>
-      )}
-    </>
-  );
+  if(gradeUpModal) return <GradeUpModal grade={gradeUpModal} pseudo={pseudo} onClose={()=>{setGradeUpModal(null);if(nonGradeNewBadges.length)setBadgeModal(true);}}/>;
+  if(badgeModal&&nonGradeNewBadges.length>0) return <BadgesUnlockModal badges={nonGradeNewBadges} onClose={()=>setBadgeModal(false)}/>;
+  return null;
 }
